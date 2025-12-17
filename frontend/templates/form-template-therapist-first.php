@@ -1,6 +1,6 @@
 <?php
 /**
- * Frontend booking form template
+ * Frontend booking form template - Therapist First Flow
  */
 
 // Exit if accessed directly
@@ -12,37 +12,50 @@ if (!defined('ABSPATH')) {
 $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 
 // Get pre-selected values
-$preselected_service = isset($atts['service_id']) ? $atts['service_id'] : '';
-$preselected_specialist = isset($atts['id']) ? $atts['id'] : '';
+$preselected_therapist = isset($atts['therapist_id']) ? $atts['therapist_id'] : '';
 
 // Form classes
-$form_classes = array('kab-booking-form');
+$form_classes = array('kab-booking-form', 'kab-therapist-first');
 $form_classes[] = 'kab-context-' . $context;
 ?>
 
 <div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>" 
-    data-service-id="<?php echo esc_attr($preselected_service); ?>" 
-    data-specialist-id="<?php echo esc_attr($preselected_specialist); ?>">
+    data-therapist-id="<?php echo esc_attr($preselected_therapist); ?>">
     
     <div class="kab-form-progress">
-        <div class="kab-progress-text">1/6</div>
+        <div class="kab-progress-text">1/4</div>
         <div class="kab-progress-bar">
-            <div class="kab-progress-fill" style="width: 16.67%"></div>
+            <div class="kab-progress-fill" style="width: 25%"></div>
         </div>
     </div>
     
     <div class="kab-form-steps">
-        <!-- Step 1: Service Selection -->
+        <!-- Step 1: Service Selection (with therapist card) -->
         <div class="kab-form-step" data-step="1">
             <div>
                 <div class="kab-step-header">
                     <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg tjeneste">
                     <h3><?php _e('Velg tjeneste', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hva kan vi hjelpe deg med?', 'konfidens-appointment-booking'); ?></p>
-                </div>            
+                </div>
+                
                 <div class="kab-services-list">
                     <div class="kab-loading"><?php _e('Loading services...', 'konfidens-appointment-booking'); ?></div>
                 </div>
+            </div>
+            <!-- Selected Therapist Card -->
+            <div class="kab-selected-therapist-card">
+                <p><?php _e('Din terapeut:', 'konfidens-appointment-booking'); ?></p>
+                <div class="kab-therapist-card-content">
+                    <div class="kab-therapist-image">
+                        <img src="" alt="" class="kab-therapist-img">
+                    </div>
+                    <div class="kab-therapist-info">
+                        <div class="kab-therapist-name"></div>
+                        <div class="kab-therapist-title"></div>
+                    </div>
+                </div>
+                <a href="#" class="kab-change-therapist-link"><?php _e('Velg en annen terapeut', 'konfidens-appointment-booking'); ?></a>
             </div>
         </div>
         
@@ -57,32 +70,14 @@ $form_classes[] = 'kab-context-' . $context;
                 <div class="kab-categories-list">
                     <div class="kab-loading"><?php _e('Loading locations...', 'konfidens-appointment-booking'); ?></div>
                 </div>
-            </div>
+            </div>    
             <div class="kab-form-navigation">
                 <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
             </div>
         </div>
         
-        <!-- Step 3: Specialist Selection -->
+        <!-- Step 3: Date & Time Selection -->
         <div class="kab-form-step" data-step="3" style="display: none;">
-            <div>
-                <div class="kab-step-header">
-                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'face.png'; ?>" alt="Din behandler">
-                    <h3><?php _e('Din behandler', 'konfidens-appointment-booking'); ?></h3>
-                    <p><?php _e('Hvilken terapeut ønsker du å bestille en samtale med?', 'konfidens-appointment-booking'); ?></p>
-                </div>        
-                <div class="kab-specialists-list">
-                    <div class="kab-loading"><?php _e('Loading therapists...', 'konfidens-appointment-booking'); ?></div>
-                </div>
-            </div>
-            <div class="kab-form-navigation">
-                <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
-                <button class="kab-random-specialist-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowright.png'; ?>" alt="<?php _e('Next', 'konfidens-appointment-booking'); ?>"></button>
-            </div>
-        </div>
-        
-        <!-- Step 4: Date & Time Selection -->
-        <div class="kab-form-step" data-step="4" style="display: none;">
             <div>
                 <div class="kab-step-header">
                     <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'date.png'; ?>" alt="Dato & klokkeslett">
@@ -95,6 +90,7 @@ $form_classes[] = 'kab-context-' . $context;
                     </div>
                     
                     <div class="kab-time-slots-container">
+                        <h4><?php _e('Available Time Slots', 'konfidens-appointment-booking'); ?></h4>
                         <div class="kab-time-slots">
                             <div class="kab-no-date-selected">
                                 <?php _e('Please select a date to view available time slots.', 'konfidens-appointment-booking'); ?>
@@ -102,14 +98,14 @@ $form_classes[] = 'kab-context-' . $context;
                         </div>
                     </div>
                 </div>
-            </div>    
+            </div>
             <div class="kab-form-navigation">
                 <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
             </div>
         </div>
         
-        <!-- Step 5: Personal Details -->
-        <div class="kab-form-step" data-step="5" style="display: none;">
+        <!-- Step 4: Personal Details -->
+        <div class="kab-form-step" data-step="4" style="display: none;">
             <div>
                 <div class="kab-step-header">
                     <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'info.png'; ?>" alt="Dine detaljer">
@@ -150,23 +146,23 @@ $form_classes[] = 'kab-context-' . $context;
                     <!-- Right column: Personal details form -->
                     <div class="kab-personal-details">
                         <div class="kab-form-group">
-                            <label for="kab-first-name"><?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?></label>
-                            <input type="text" id="kab-first-name" name="first_name" required placeholder="<?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?>">
+                            <label for="kab-first-name-tf"><?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?></label>
+                            <input type="text" id="kab-first-name-tf" name="first_name" required placeholder="<?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?>">
                         </div>
                         
                         <div class="kab-form-group">
-                            <label for="kab-email"><?php _e('Din e-post', 'konfidens-appointment-booking'); ?></label>
-                            <input type="email" id="kab-email" name="email" required placeholder="<?php _e('Din e-post', 'konfidens-appointment-booking'); ?>">
+                            <label for="kab-email-tf"><?php _e('Din e-post', 'konfidens-appointment-booking'); ?></label>
+                            <input type="email" id="kab-email-tf" name="email" required placeholder="<?php _e('Din e-post', 'konfidens-appointment-booking'); ?>">
                         </div>
                         
                         <div class="kab-form-group">
-                            <label for="kab-phone"><?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?></label>
-                            <input type="tel" id="kab-phone" name="phone" required placeholder="<?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?>">
+                            <label for="kab-phone-tf"><?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?></label>
+                            <input type="tel" id="kab-phone-tf" name="phone" required placeholder="<?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?>">
                         </div>
                         
                         <div class="kab-form-group kab-checkbox-group">
-                            <input type="checkbox" id="kab-terms" name="terms" required>
-                            <label for="kab-terms"><?php _e('Klikk & samtykk til våre', 'konfidens-appointment-booking'); ?> <a href="#" class="kab-terms-link"><?php _e('handelsbetingelser', 'konfidens-appointment-booking'); ?></a> <?php _e('for å fullføre bestilling.', 'konfidens-appointment-booking'); ?></label>
+                            <input type="checkbox" id="kab-terms-tf" name="terms" required>
+                            <label for="kab-terms-tf"><?php _e('Klikk & samtykk til våre', 'konfidens-appointment-booking'); ?> <a href="#" class="kab-terms-link"><?php _e('handelsbetingelser', 'konfidens-appointment-booking'); ?></a> <?php _e('for å fullføre bestilling.', 'konfidens-appointment-booking'); ?></label>
                         </div>
                         
                         <?php if (get_option('kab_enable_recaptcha', false) && !empty(get_option('kab_recaptcha_site_key', ''))): ?>
@@ -180,22 +176,26 @@ $form_classes[] = 'kab-context-' . $context;
                         </div>
                     </div>
                 </div>
-            </div>
+            </div>    
             <div class="kab-details-navigation">
                 <button type="button" class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
             </div>
         </div>
         
-        <!-- Step 6: Confirmation -->
-        <div class="kab-form-step" data-step="6" style="display: none;">
+        <!-- Step 5: Confirmation -->
+        <div class="kab-form-step" data-step="5" style="display: none;">
             <div>
                 <div class="kab-confirmation-message">
                     <div class="kab-loading"><?php _e('Processing your booking...', 'konfidens-appointment-booking'); ?></div>
                     <div class="kab-success" style="display: none;">
                         <div class="kab-success-icon">✓</div>
-                        <h3><?php _e('Booking Confirmed!', 'konfidens-appointment-booking'); ?></h3>
-                        <p class="kab-booking-message"></p>
+                        <h3><?php _e('Du har bestilt din samtale!', 'konfidens-appointment-booking'); ?></h3>
+                        <p class="kab-booking-message"><?php _e('Vi har sendt deg en bekreftelse på e-post. Vennligst sjekk innboksen din for å bekrefte at alle opplysningene stemmer.', 'konfidens-appointment-booking'); ?></p>
                         <div class="kab-booking-details"></div>
+                        <div class="kab-confirmation-buttons">
+                            <button class="kab-book-new-btn"><?php _e('Bestill en ny time', 'konfidens-appointment-booking'); ?></button>
+                            <button class="kab-close-window-btn"><?php _e('Lukk vindu', 'konfidens-appointment-booking'); ?></button>
+                        </div>
                     </div>
                     <div class="kab-error" style="display: none;">
                         <div class="kab-error-icon">✗</div>
@@ -208,3 +208,4 @@ $form_classes[] = 'kab-context-' . $context;
         </div>
     </div>
 </div>
+

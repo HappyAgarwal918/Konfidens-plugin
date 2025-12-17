@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -101,6 +101,9 @@ function kab_enqueue_scripts() {
     wp_enqueue_style('kab-css', KAB_PLUGIN_URL . 'frontend/assets/public.css', array(), KAB_VERSION);
     wp_enqueue_script('kab-js', KAB_PLUGIN_URL . 'frontend/assets/public.js', array('jquery'), KAB_VERSION, true);
     
+    // Enqueue therapist-first form script
+    wp_enqueue_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
+    
     // Add reCAPTCHA if enabled
     if (get_option('kab_enable_recaptcha', false)) {
         $recaptcha_site_key = get_option('kab_recaptcha_site_key', '');
@@ -110,8 +113,25 @@ function kab_enqueue_scripts() {
         }
     }
     
-    // Localize script
+    // Localize script (shared by both forms)
     wp_localize_script('kab-js', 'kab_vars', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('kab-public-nonce'),
+        'plugin_url' => plugin_dir_url(__FILE__),
+        'loading' => __('Loading...', 'konfidens-appointment-booking'),
+        'error' => __('Error occurred. Please try again.', 'konfidens-appointment-booking'),
+        'no_services' => __('No services available.', 'konfidens-appointment-booking'),
+        'no_specialists' => __('No specialists available for this service.', 'konfidens-appointment-booking'),
+        'no_timeslots' => __('No available time slots for the selected date.', 'konfidens-appointment-booking'),
+        'select_service' => __('Please select a service.', 'konfidens-appointment-booking'),
+        'select_specialist' => __('Please select a specialist.', 'konfidens-appointment-booking'),
+        'select_date' => __('Please select a date.', 'konfidens-appointment-booking'),
+        'select_time' => __('Please select a time slot.', 'konfidens-appointment-booking'),
+        'recaptcha_site_key' => get_option('kab_recaptcha_site_key', '')
+    ));
+    
+    // Also localize for therapist-first script
+    wp_localize_script('kab-js-therapist-first', 'kab_vars', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('kab-public-nonce'),
         'plugin_url' => plugin_dir_url(__FILE__),
@@ -254,6 +274,7 @@ function kab_appointment_form_shortcode($atts) {
     $atts = shortcode_atts(
         array(
             'context' => 'sidebar', // sidebar or popup
+            'therapist_id' => '', // For therapist-first flow
         ),
         $atts,
         'kab_appointment_form'
@@ -262,8 +283,13 @@ function kab_appointment_form_shortcode($atts) {
     // Start output buffering
     ob_start();
     
-    // Include form template
-    include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
+    // If therapist_id is provided, use therapist-first template
+    if (!empty($atts['therapist_id'])) {
+        include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
+    } else {
+        // Include regular form template
+        include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
+    }
     
     // Return buffered content
     return ob_get_clean();
@@ -328,7 +354,26 @@ function kab_button_shortcode($atts, $content = null) {
         <div class="kab-popup-content">
             <button class="kab-popup-close">&times;</button>
             <div class="kab-popup-inner">
-                <?php include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php'; ?>
+                <?php 
+                // If therapist_id (id attribute) is provided, use therapist-first template
+                if (!empty($atts['id'])) {
+                    $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
+                    // Set $atts for the template
+                    $atts = $therapist_atts;
+                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
+                } else {
+                    // Pass service_id and specialist_id to the form if provided
+                    $form_atts = array('context' => 'popup');
+                    if (!empty($atts['service_id'])) {
+                        $form_atts['service_id'] = $atts['service_id'];
+                    }
+                    if (!empty($atts['id'])) {
+                        $form_atts['id'] = $atts['id']; // specialist_id
+                    }
+                    $atts = $form_atts;
+                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
+                }
+                ?>
             </div>
         </div>
     </div>

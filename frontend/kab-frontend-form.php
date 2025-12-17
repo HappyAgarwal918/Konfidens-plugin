@@ -138,6 +138,143 @@ add_action('wp_ajax_kab_get_specialists', 'kab_get_specialists_ajax');
 add_action('wp_ajax_nopriv_kab_get_specialists', 'kab_get_specialists_ajax');
 
 /**
+ * AJAX handler for getting all therapists (not filtered by service)
+ */
+function kab_get_all_therapists_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Get all therapists (returns associative array with therapist IDs as keys)
+    $therapists = kab_get_all_therapists();
+    
+    // Process therapist data to ensure image URLs are properly formatted
+    $therapists_array = array();
+    if (!empty($therapists)) {
+        foreach ($therapists as $therapist_id => $therapist) {
+            // Ensure therapist has an ID
+            if (!isset($therapist['id'])) {
+                $therapist['id'] = $therapist_id;
+            }
+            
+            // Process image URL
+            if (isset($therapist['profile_image'])) {
+                $therapist['image_url'] = $therapist['profile_image'];
+            } else if (isset($therapist['profilepicture'])) {
+                $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['profilepicture'];
+            } else if (isset($therapist['image']) && strpos($therapist['image'], 'http') !== 0) {
+                $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['image'];
+            }
+            
+            $therapists_array[] = $therapist;
+        }
+    }
+    
+    if (!empty($therapists_array)) {
+        wp_send_json_success(array('therapists' => $therapists_array));
+    } else {
+        wp_send_json_error(array('message' => __('No therapists available.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_all_therapists', 'kab_get_all_therapists_ajax');
+add_action('wp_ajax_nopriv_kab_get_all_therapists', 'kab_get_all_therapists_ajax');
+
+/**
+ * AJAX handler for getting services for a specific therapist
+ */
+function kab_get_services_for_therapist_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
+        wp_send_json_error(array('message' => __('Therapist ID is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $therapist_id = sanitize_text_field($_POST['therapist_id']);
+    
+    // Get all services with priority
+    $all_services = kab_get_services_with_priority();
+    
+    // Filter services that belong to this therapist
+    $therapist_services = array();
+    
+    foreach ($all_services as $service) {
+        // Get therapists for this service
+        $service_therapists = kab_get_therapists_for_service($service['id']);
+        
+        // Check if this therapist is in the list
+        foreach ($service_therapists as $therapist) {
+            if ($therapist['id'] === $therapist_id) {
+                $therapist_services[] = $service;
+                break;
+            }
+        }
+    }
+    
+    if (!empty($therapist_services)) {
+        wp_send_json_success(array('services' => $therapist_services));
+    } else {
+        wp_send_json_error(array('message' => __('No services available for this therapist.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_services_for_therapist', 'kab_get_services_for_therapist_ajax');
+add_action('wp_ajax_nopriv_kab_get_services_for_therapist', 'kab_get_services_for_therapist_ajax');
+
+/**
+ * AJAX handler for getting locations for a specific therapist and service
+ */
+function kab_get_locations_for_therapist_service_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['service_id']) || empty($_POST['service_id']) ||
+        !isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
+        wp_send_json_error(array('message' => __('Service ID and Therapist ID are required.', 'konfidens-appointment-booking')));
+    }
+    
+    $service_id = sanitize_text_field($_POST['service_id']);
+    $therapist_id = sanitize_text_field($_POST['therapist_id']);
+    
+    // Get service locations
+    $service_location_ids = kab_get_service_locations($service_id);
+    
+    // Get therapist locations
+    $therapist_location_ids = kab_get_specialist_locations($therapist_id);
+    
+    // Find intersection - locations that are available for both service and therapist
+    $available_location_ids = array_intersect($service_location_ids, $therapist_location_ids);
+    
+    if (!empty($available_location_ids)) {
+        $locations = array();
+        
+        foreach ($available_location_ids as $location_id) {
+            $location = kab_get_location_by_id($location_id);
+            
+            if ($location) {
+                $locations[] = $location;
+            }
+        }
+        
+        if (!empty($locations)) {
+            wp_send_json_success(array('locations' => $locations));
+        } else {
+            wp_send_json_error(array('message' => __('No locations available for this therapist and service combination.', 'konfidens-appointment-booking')));
+        }
+    } else {
+        wp_send_json_error(array('message' => __('No locations available for this therapist and service combination.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_locations_for_therapist_service', 'kab_get_locations_for_therapist_service_ajax');
+add_action('wp_ajax_nopriv_kab_get_locations_for_therapist_service', 'kab_get_locations_for_therapist_service_ajax');
+
+/**
  * AJAX handler for getting available dates
  */
 function kab_get_available_dates() {
@@ -329,10 +466,11 @@ function kab_create_booking() {
         'specialist_id' => __('Specialist is required.', 'konfidens-appointment-booking'),
         'timeslot' => __('Time slot is required.', 'konfidens-appointment-booking'),
         'first_name' => __('First name is required.', 'konfidens-appointment-booking'),
-        'last_name' => __('Last name is required.', 'konfidens-appointment-booking'),
         'email' => __('Email is required.', 'konfidens-appointment-booking'),
         'phone' => __('Phone number is required.', 'konfidens-appointment-booking')
     );
+    
+    // Last name is optional (for therapist-first form)
     
     foreach ($required_fields as $field => $message) {
         if (!isset($_POST[$field]) || empty($_POST[$field])) {
@@ -378,7 +516,7 @@ function kab_create_booking() {
     $specialist_id = sanitize_text_field($_POST['specialist_id']);
     $timeslot = sanitize_text_field($_POST['timeslot']);
     $first_name = sanitize_text_field($_POST['first_name']);
-    $last_name = sanitize_text_field($_POST['last_name']);
+    $last_name = isset($_POST['last_name']) ? sanitize_text_field($_POST['last_name']) : '';
     $email = sanitize_email($_POST['email']);
     $phone = sanitize_text_field($_POST['phone']);
     $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';

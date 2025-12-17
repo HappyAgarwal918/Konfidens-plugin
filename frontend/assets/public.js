@@ -34,6 +34,16 @@
          * Initialize the form
          */
         init() {
+            // Hide all steps initially
+            this.$form.find('.kab-form-step').hide();
+            
+            // If serviceId is set, go directly to step 2, otherwise show step 1
+            if (this.serviceId) {
+                this.goToStep(2);
+            } else {
+                this.goToStep(1);
+            }
+            
             this.initEvents();
             this.loadServices();
             
@@ -432,24 +442,30 @@
             });
             
             // Handle "Les mer" link clicks
-            this.$form.on('click', '.kab-read-more', function(e) {
+            this.$form.off('click', '.kab-read-more').on('click', '.kab-read-more', function(e) {
                 e.preventDefault();
-                const $description = $(this).prev('.kab-specialist-description');
-                const $card = $(this).closest('.kab-specialist-card');
+                const $link = $(this);
+                const $description = $link.prev('.kab-specialist-description');
+                const $card = $link.closest('.kab-specialist-card');
                 const specialistId = $card.data('specialist-id');
-                const specialist = response.data.specialists.find(s => s.id === specialistId);
+                
+                // Get specialist from stored specialists array
+                const specialist = self.specialists.find(s => s.id === specialistId);
                 
                 if (specialist && specialist.description) {
                     // Toggle between short and full description
-                    if ($(this).hasClass('expanded')) {
+                    if ($link.hasClass('expanded')) {
                         // Show short description
-                        const shortDesc = specialist.description.substring(0, 150) + '...';
+                        const maxLength = 150;
+                        const shortDesc = specialist.description.length > maxLength 
+                            ? specialist.description.substring(0, maxLength) + '...' 
+                            : specialist.description;
                         $description.text(shortDesc);
-                        $(this).text('Les mer').removeClass('expanded');
+                        $link.text('Les mer').removeClass('expanded');
                     } else {
                         // Show full description
                         $description.text(specialist.description);
-                        $(this).text('Vis mindre').addClass('expanded');
+                        $link.text('Vis mindre').addClass('expanded');
                     }
                 }
             });
@@ -707,6 +723,37 @@
                 case 6:
                     this.submitBooking();
                     break;
+            }
+        }
+        
+        /**
+         * Reset form to initial state
+         */
+        resetForm() {
+            // Reset all selections except serviceId and specialistId (they come from button)
+            this.locationId = '';
+            this.selectedDate = '';
+            this.selectedTime = '';
+            
+            // Reset UI selections
+            this.$form.find('.kab-service-item').removeClass('selected');
+            this.$form.find('.kab-category-item').removeClass('selected');
+            this.$form.find('.kab-date-item').removeClass('selected');
+            this.$form.find('.kab-time-slot').removeClass('selected');
+            
+            // Reset navigation buttons
+            this.$form.find('.kab-next-btn').prop('disabled', true);
+            this.$form.find('.kab-prev-btn').prop('disabled', false);
+            
+            // If service is preselected, go directly to step 2, otherwise step 1
+            if (this.serviceId) {
+                // Select the service visually
+                this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`).addClass('selected');
+                this.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
+                // Go directly to step 2 without showing step 1
+                this.goToStep(2);
+            } else {
+                this.goToStep(1);
             }
         }
         
@@ -1096,15 +1143,91 @@
      * Initialize booking forms when DOM is ready
      */
     $(document).ready(function() {
-        // Initialize booking forms
-        $('.kab-booking-form').each(function() {
-            new KABBookingForm($(this));
+        // Initialize booking forms (skip forms in hidden popups and therapist-first forms - they'll be initialized when popup opens or by their own script)
+        $('.kab-booking-form').not('.kab-popup .kab-booking-form').not('.kab-therapist-first').each(function() {
+            const $form = $(this);
+            const instance = new KABBookingForm($form);
+            $form.data('kab-form-instance', instance);
         });
         
         // Initialize popup functionality
         $('.kab-button[data-popup-target]').click(function() {
-            const popupId = $(this).data('popup-target');
-            $('#' + popupId).show();
+            const $button = $(this);
+            const popupId = $button.data('popup-target');
+            const $popup = $('#' + popupId);
+            
+            // Get service_id and specialist_id from button
+            const serviceId = $button.data('service-id') || '';
+            const specialistId = $button.data('specialist-id') || '';
+            
+            // Show popup
+            $popup.show();
+            
+            // Skip if this is a therapist-first form (handled by public-therapist-first.js)
+            const $therapistForm = $popup.find('.kab-booking-form.kab-therapist-first');
+            if ($therapistForm.length) {
+                return; // Don't process therapist-first forms here
+            }
+            
+            // Handle regular booking form
+            const $form = $popup.find('.kab-booking-form');
+            if ($form.length) {
+                // Apply data attributes from button if present
+                if (serviceId) {
+                    $form.attr('data-service-id', serviceId);
+                }
+                if (specialistId) {
+                    $form.attr('data-specialist-id', specialistId);
+                }
+                
+                // Get or create form instance
+                let formInstance = $form.data('kab-form-instance');
+                if (!formInstance) {
+                    formInstance = new KABBookingForm($form);
+                    $form.data('kab-form-instance', formInstance);
+                } else {
+                    // Reset form state when reopening popup
+                    // But preserve serviceId and specialistId if they're being set
+                    const currentServiceId = formInstance.serviceId;
+                    const currentSpecialistId = formInstance.specialistId;
+                    formInstance.resetForm();
+                    // Restore serviceId and specialistId after reset
+                    if (currentServiceId) formInstance.serviceId = currentServiceId;
+                    if (currentSpecialistId) formInstance.specialistId = currentSpecialistId;
+                }
+                
+                // If serviceId provided, ensure it's selected and we move to step 2
+                if (serviceId) {
+                    formInstance.serviceId = serviceId;
+                    // Update the data attribute
+                    $form.attr('data-service-id', serviceId);
+                    
+                    // If services are already loaded, select directly and go to step 2
+                    if (formInstance.services && formInstance.services.length > 0) {
+                        const serviceExists = formInstance.services.some(s => s.id === serviceId);
+                        if (serviceExists) {
+                            // Select service visually (without auto-advance)
+                            formInstance.selectService(serviceId, false);
+                            // Go directly to step 2 without showing step 1
+                            setTimeout(() => {
+                                formInstance.goToStep(2);
+                            }, 50);
+                        } else {
+                            formInstance.loadServices();
+                        }
+                    } else {
+                        // Services not loaded yet; load and auto-select
+                        formInstance.loadServices();
+                    }
+                } else {
+                    // No preselected service; reset to step 1
+                    formInstance.goToStep(1);
+                    // If not initialized before, ensure services load
+                    if (!formInstance.services || formInstance.services.length === 0) {
+                        formInstance.loadServices();
+                    }
+                }
+            }
         });
         
         $('.kab-popup-close').click(function() {
