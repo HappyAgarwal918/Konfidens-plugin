@@ -172,7 +172,7 @@ $form_classes[] = 'kab-context-' . $context;
                         <?php endif; ?>
                         
                         <div class="kab-form-navigation">
-                            <button type="submit" class="kab-submit-btn"><?php _e('Bekreft reservasjon', 'konfidens-appointment-booking'); ?></button>
+                            <button type="button" class="kab-submit-btn"><?php _e('Bekreft reservasjon', 'konfidens-appointment-booking'); ?></button>
                         </div>
                     </div>
                 </div>

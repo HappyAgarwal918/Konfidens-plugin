@@ -100,7 +100,43 @@
                 self.prevStep();
             });
             
-            // Form submission
+            // Form submission - handle button click since there's no form element
+            this.$form.on('click', '.kab-submit-btn', function(e) {
+                e.preventDefault();
+                
+                // Validate form fields first
+                const firstName = self.$form.find('#kab-first-name').val();
+                const lastName = self.$form.find('#kab-last-name').val() || ''; // Last name is optional
+                const email = self.$form.find('#kab-email').val();
+                const phone = self.$form.find('#kab-phone').val();
+                const terms = self.$form.find('#kab-terms').is(':checked');
+                
+                // Check if all required fields are filled (last name is optional)
+                if (!firstName || !email || !phone) {
+                    alert('Please fill in all required fields.');
+                    return false;
+                }
+                
+                // Check if terms are accepted
+                if (!terms) {
+                    alert('Please accept the terms and conditions to continue.');
+                    return false;
+                }
+                
+                // Validate email format
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address.');
+                    return false;
+                }
+                
+                // If validation passes, go to confirmation step and submit
+                self.goToStep(6);
+                self.submitBooking();
+                return false;
+            });
+            
+            // Form submission (fallback for actual form elements)
             this.$form.on('submit', function(e) {
                 e.preventDefault();
                 self.submitBooking();
@@ -347,9 +383,12 @@
         getSpecialistTags(specialist) {
             const tags = [];
             
-            // Try to extract tags from different possible sources in the specialist data
+            // 1. First priority: Check for stored tags from database (admin-managed)
+            if (specialist.stored_tags && Array.isArray(specialist.stored_tags) && specialist.stored_tags.length > 0) {
+                return specialist.stored_tags;
+            }
             
-            // 1. Check for categories/specialties directly in the specialist object
+            // 2. Second priority: Check for categories/specialties directly in the specialist object (from API)
             if (specialist.categories && Array.isArray(specialist.categories)) {
                 specialist.categories.forEach(category => {
                     if (typeof category === 'string') {
@@ -360,7 +399,7 @@
                 });
             }
             
-            // 2. Check for specialties
+            // 3. Third priority: Check for specialties (from API)
             if (specialist.specialties && Array.isArray(specialist.specialties)) {
                 specialist.specialties.forEach(specialty => {
                     if (typeof specialty === 'string') {
@@ -371,7 +410,7 @@
                 });
             }
             
-            // 3. If no tags found, add some default tags from the screenshot
+            // 4. Last resort: If no tags found, add some default tags
             if (tags.length === 0) {
                 // These are example tags from the screenshot
                 const defaultTags = ['Angst', 'Utbrenthet', 'Selvfølelse/selvbilde', 'Psykiske utfordringer', 'Personlig vekst'];
@@ -1036,16 +1075,24 @@
             
             // Get form data
             const firstName = this.$form.find('#kab-first-name').val();
-            const lastName = this.$form.find('#kab-last-name').val();
+            const lastName = this.$form.find('#kab-last-name').val() || ''; // Last name is optional
             const email = this.$form.find('#kab-email').val();
             const phone = this.$form.find('#kab-phone').val();
-            const notes = this.$form.find('#kab-notes').val();
+            const notes = this.$form.find('#kab-notes').val() || ''; // Notes are optional
             
-            // Validate form data
-            if (!firstName || !lastName || !email || !phone) {
+            // Validate form data (last name is optional)
+            if (!firstName || !email || !phone) {
                 $loading.hide();
                 $error.show();
                 $error.find('.kab-error-message').text('Please fill in all required fields.');
+                return;
+            }
+            
+            // Validate that we have all booking data
+            if (!this.serviceId || !this.specialistId || !this.selectedTime) {
+                $loading.hide();
+                $error.show();
+                $error.find('.kab-error-message').text('Missing booking information. Please go back and complete all steps.');
                 return;
             }
             

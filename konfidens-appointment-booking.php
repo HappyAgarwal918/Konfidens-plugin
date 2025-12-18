@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking

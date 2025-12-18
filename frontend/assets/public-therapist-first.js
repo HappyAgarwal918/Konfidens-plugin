@@ -84,7 +84,42 @@
                 self.prevStep();
             });
             
-            // Form submission
+            // Form submission - handle button click since there's no form element
+            this.$form.on('click', '.kab-submit-btn', function(e) {
+                e.preventDefault();
+                
+                // Validate form fields first
+                const firstName = self.$form.find('#kab-first-name-tf').val();
+                const email = self.$form.find('#kab-email-tf').val();
+                const phone = self.$form.find('#kab-phone-tf').val();
+                const terms = self.$form.find('#kab-terms-tf').is(':checked');
+                
+                // Check if all required fields are filled
+                if (!firstName || !email || !phone) {
+                    alert('Please fill in all required fields.');
+                    return false;
+                }
+                
+                // Check if terms are accepted
+                if (!terms) {
+                    alert('Please accept the terms and conditions to continue.');
+                    return false;
+                }
+                
+                // Validate email format
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('Please enter a valid email address.');
+                    return false;
+                }
+                
+                // If validation passes, go to confirmation step and submit
+                self.goToStep(5);
+                self.submitBooking();
+                return false;
+            });
+            
+            // Form submission (fallback for actual form elements)
             this.$form.on('submit', function(e) {
                 e.preventDefault();
                 self.submitBooking();
@@ -486,7 +521,8 @@
                     this.updateBookingSummary();
                     break;
                 case 5:
-                    // Confirmation step - handled by submitBooking
+                    // Confirmation step - show loading state
+                    // submitBooking will be called separately
                     break;
             }
         }
@@ -707,6 +743,14 @@
                 return;
             }
             
+            // Validate that we have all booking data
+            if (!this.serviceId || !this.therapistId || !this.selectedTime) {
+                $loading.hide();
+                $error.show();
+                $error.find('.kab-error-message').text('Missing booking information. Please go back and complete all steps.');
+                return;
+            }
+            
             // Show loading
             $loading.show();
             $success.hide();
@@ -759,6 +803,18 @@
                     if (response.success) {
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message || 'Booking created successfully.');
+                        
+                        // Build booking details for display
+                        let bookingDetails = '';
+                        if (response.data.booking_id) {
+                            bookingDetails += `
+                                <div class="kab-booking-info-item">
+                                    <span class="kab-booking-info-label">Booking ID:</span>
+                                    <span class="kab-booking-info-value">${response.data.booking_id}</span>
+                                </div>
+                            `;
+                        }
+                        $success.find('.kab-booking-details').html(bookingDetails);
                         
                         if (response.data.redirect_url) {
                             setTimeout(function() {

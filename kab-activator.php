@@ -79,11 +79,9 @@ function kab_add_default_categories() {
     if ($count == 0) {
         // Add default categories
         $default_categories = array(
-            'Gratis «Bli kjent» samtaler',
-            'Online video samtaler',
+            'Online Video Samtale',
             'Hjemmebesøk',
-            'Samtaler på kontor',
-            'Other'
+            'På vårt kontor'
         );
         
         foreach ($default_categories as $category) {

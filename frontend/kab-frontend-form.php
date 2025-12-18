@@ -111,6 +111,12 @@ function kab_get_specialists_ajax() {
             else if (isset($specialist['image']) && strpos($specialist['image'], 'http') !== 0) {
                 $specialists[$key]['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $specialist['image'];
             }
+            
+            // Add stored tags from database
+            $stored_tags = kab_get_specialist_tags($specialist['id']);
+            if (!empty($stored_tags)) {
+                $specialists[$key]['stored_tags'] = $stored_tags;
+            }
         }
     }
     
@@ -165,6 +171,12 @@ function kab_get_all_therapists_ajax() {
                 $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['profilepicture'];
             } else if (isset($therapist['image']) && strpos($therapist['image'], 'http') !== 0) {
                 $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['image'];
+            }
+            
+            // Add stored tags from database
+            $stored_tags = kab_get_specialist_tags($therapist['id']);
+            if (!empty($stored_tags)) {
+                $therapist['stored_tags'] = $stored_tags;
             }
             
             $therapists_array[] = $therapist;

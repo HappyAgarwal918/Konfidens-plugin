@@ -58,10 +58,17 @@ function kab_create_tables() {
         id int(11) NOT NULL AUTO_INCREMENT,
         location_ids text NOT NULL,
         specialist_id varchar(50) NOT NULL,
+        tags text DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
     ) $charset_collate;");
+    
+    // Add tags column if it doesn't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'tags'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $location_specialist_table ADD COLUMN tags text DEFAULT '' AFTER specialist_id");
+    }
     
     // Create booking form data table
     $booking_form_data_table = $wpdb->prefix . 'kab_booking_form_data';
@@ -297,6 +304,70 @@ function kab_add_update_specialist_location($specialist_id, $location_ids) {
         );
         
         return $result ? $wpdb->insert_id : false;
+    }
+}
+
+/**
+ * Get specialist tags
+ */
+function kab_get_specialist_tags($specialist_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    
+    $specialist_data = $wpdb->get_row($wpdb->prepare("SELECT tags FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    
+    if ($specialist_data && !empty($specialist_data->tags)) {
+        // Split by comma and trim each tag
+        $tags = array_map('trim', explode(',', $specialist_data->tags));
+        // Remove empty tags
+        return array_filter($tags);
+    }
+    
+    return array();
+}
+
+/**
+ * Update specialist tags
+ */
+function kab_update_specialist_tags($specialist_id, $tags) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    
+    // Sanitize tags - remove extra spaces and clean
+    $tags_string = sanitize_text_field($tags);
+    
+    // Check if tags column exists, if not add it
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'tags'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN tags text DEFAULT '' AFTER specialist_id");
+    }
+    
+    $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    
+    if ($existing) {
+        $result = $wpdb->update(
+            $table_name,
+            array('tags' => $tags_string),
+            array('specialist_id' => $specialist_id),
+            array('%s'),
+            array('%s')
+        );
+        
+        // wpdb->update returns number of rows affected (0 or more), false on error
+        return $result !== false;
+    } else {
+        // If no record exists, create one with empty location_ids
+        $result = $wpdb->insert(
+            $table_name,
+            array(
+                'specialist_id' => sanitize_text_field($specialist_id),
+                'location_ids' => '',
+                'tags' => $tags_string
+            ),
+            array('%s', '%s', '%s')
+        );
+        
+        return $result !== false;
     }
 }
 
