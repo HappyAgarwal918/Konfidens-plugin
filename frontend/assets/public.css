@@ -340,6 +340,38 @@
     background-color: #5e35b1;
 }
 
+/* Therapist selection grid for therapist-first form step 0 */
+.kab-therapists-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.kab-therapist-select-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kab-therapist-select-card:hover {
+    transform: translateY(-2px);
+}
+
+.kab-therapist-select-card:hover .kab-therapist-card-content {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kab-therapist-select-card .kab-therapist-card-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s;
+}
+
 .kab-slider-arrow {
     position: absolute;
     top: 35%;

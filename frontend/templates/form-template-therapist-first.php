@@ -30,6 +30,23 @@ $form_classes[] = 'kab-context-' . $context;
     </div>
     
     <div class="kab-form-steps">
+        <!-- Step 0: Therapist Selection (when changing therapist) -->
+        <div class="kab-form-step" data-step="0" style="display: none;">
+            <div>
+                <div class="kab-step-header">
+                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'face.png'; ?>" alt="Din behandler">
+                    <h3><?php _e('Din behandler', 'konfidens-appointment-booking'); ?></h3>
+                    <p><?php _e('Hvilken terapeut ønsker du å bestille en samtale med?', 'konfidens-appointment-booking'); ?></p>
+                </div>
+                <div class="kab-specialists-list">
+                    <div class="kab-loading"><?php _e('Loading therapists...', 'konfidens-appointment-booking'); ?></div>
+                </div>
+            </div>
+            <div class="kab-form-navigation">
+                <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
+            </div>
+        </div>
+        
         <!-- Step 1: Service Selection (with therapist card) -->
         <div class="kab-form-step" data-step="1">
             <div>

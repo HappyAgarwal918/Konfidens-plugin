@@ -26,6 +26,7 @@
             this.selectedTime = '';
             this.services = [];
             this.therapist = null;
+            this.allTherapists = []; // Store all therapists for selection step
             
             this.init();
         }
@@ -135,9 +136,14 @@
             // Change therapist link
             this.$form.on('click', '.kab-change-therapist-link', function(e) {
                 e.preventDefault();
-                // This could trigger opening the therapist selection modal
-                // For now, we'll just log it
-                console.log('Change therapist clicked');
+                self.goToStep(0);
+                self.loadAllTherapists();
+            });
+            
+            // Therapist selection in step 0 - make entire card clickable
+            this.$form.on('click', '.kab-therapist-select-card', function() {
+                const therapistId = $(this).data('therapist-id');
+                self.selectNewTherapist(therapistId);
             });
         }
         
@@ -266,6 +272,87 @@
                     $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
+        }
+        
+        /**
+         * Load all therapists for selection
+         */
+        loadAllTherapists() {
+            const self = this;
+            const $therapistsList = this.$form.find('.kab-specialists-list');
+            
+            $therapistsList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_all_therapists',
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data.therapists) {
+                        // Store all therapists
+                        self.allTherapists = response.data.therapists;
+                        
+                        let html = '<div class="kab-therapists-grid">';
+                        
+                        $.each(response.data.therapists, function(index, therapist) {
+                            const imageUrl = therapist.image_url || therapist.profile_image || therapist.image || 'https://via.placeholder.com/100';
+                            const therapistName = therapist.name || '';
+                            const therapistTitle = therapist.title || '';
+                            
+                            html += `
+                                <div class="kab-therapist-select-card" data-therapist-id="${therapist.id}">
+                                    <div class="kab-therapist-card-content">
+                                        <div class="kab-therapist-image">
+                                            <img src="${imageUrl}" alt="${therapistName}" class="kab-therapist-img">
+                                        </div>
+                                        <div class="kab-therapist-info">
+                                            <div class="kab-therapist-name">${therapistName}</div>
+                                            ${therapistTitle ? `<div class="kab-therapist-title">${therapistTitle}</div>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        
+                        html += '</div>';
+                        $therapistsList.html(html);
+                    } else {
+                        $therapistsList.html('<div class="kab-no-data">' + (response.data?.message || 'No therapists available.') + '</div>');
+                    }
+                },
+                error: function() {
+                    $therapistsList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                }
+            });
+        }
+        
+        /**
+         * Select a new therapist and reload services
+         */
+        selectNewTherapist(therapistId) {
+            const self = this;
+            
+            // Update therapist ID
+            this.therapistId = therapistId;
+            this.$form.attr('data-therapist-id', therapistId);
+            
+            // Reset service selection
+            this.serviceId = '';
+            this.locationId = '';
+            this.selectedDate = '';
+            this.selectedTime = '';
+            
+            // Reload therapist info
+            this.loadTherapist();
+            
+            // Reload services for the new therapist
+            this.loadServices();
+            
+            // Go back to step 1
+            this.goToStep(1);
         }
         
         /**
@@ -479,8 +566,13 @@
          * Go to previous step
          */
         prevStep() {
-            if (this.currentStep > 1) {
-                this.goToStep(this.currentStep - 1);
+            if (this.currentStep > 0) {
+                // If on step 0, go back to step 1
+                if (this.currentStep === 0) {
+                    this.goToStep(1);
+                } else {
+                    this.goToStep(this.currentStep - 1);
+                }
             }
         }
         
@@ -494,10 +586,16 @@
             // Show the target step
             this.$form.find(`.kab-form-step[data-step="${step}"]`).show();
             
-            // Update progress
-            const progressPercentage = (step / this.maxStep) * 100;
-            this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
-            this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
+            // Update progress - step 0 is a special step, so don't count it in progress
+            if (step === 0) {
+                // When on therapist selection step, show step 1 progress
+                this.$form.find('.kab-progress-text').text(`1/${this.maxStep}`);
+                this.$form.find('.kab-progress-fill').css('width', '25%');
+            } else {
+                const progressPercentage = (step / this.maxStep) * 100;
+                this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
+                this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
+            }
             
             // Update current step
             this.currentStep = step;
@@ -511,6 +609,9 @@
          */
         handleStepChange(step) {
             switch (step) {
+                case 0:
+                    // Therapist selection step - already loaded in loadAllTherapists
+                    break;
                 case 2:
                     this.loadCategories();
                     break;
