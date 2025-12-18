@@ -218,7 +218,23 @@ function kab_api_request($endpoint, $args = array(), $method = 'GET') {
     if ($method === 'GET') {
         $url = add_query_arg($args, $url);
     } else {
-        $request_args['body'] = json_encode($args);
+        // For POST/PUT/DELETE, check if there's a 'clinic_id' in args
+        // Some APIs expect clinic_id as query parameter even for POST requests
+        $body_args = $args;
+        $query_params = array();
+        
+        // Extract clinic_id if present (common pattern for multi-tenant APIs)
+        if (isset($args['clinic_id'])) {
+            $query_params['clinic_id'] = $args['clinic_id'];
+            unset($body_args['clinic_id']);
+        }
+        
+        // Add query parameters to URL if any
+        if (!empty($query_params)) {
+            $url = add_query_arg($query_params, $url);
+        }
+        
+        $request_args['body'] = json_encode($body_args);
     }
     
     $response = wp_remote_request($url, $request_args);

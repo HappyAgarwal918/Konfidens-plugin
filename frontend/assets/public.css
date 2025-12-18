@@ -61,11 +61,21 @@
     min-height: 520px;
 }
 
-.kab-form-step h3 {
+.kab-form-step .kab-step-header h3 {
+    font-family: "Playfair Display", Sans-serif;
     margin-top: 0;
     margin-bottom: 10px;
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.2px;
+    color: #1D1C1F;
+}
+.kab-form-step .kab-step-header p{
+    font-family: "Manrope", Sans-serif;
     font-size: 18px;
-    font-weight: 600;
+    font-weight: 400;
+    letter-spacing: .0.3px;
+    color: #1D1C1F;
 }
 
 /* Service Selection */
@@ -92,11 +102,13 @@
     background-color: #d9d6e5;
 }
 
-.kab-service-info h4 {
-    margin: 0;
+.kab-service-info p, .kab-category-name {
+    font-family: "Manrope", Sans-serif;
     font-size: 18px;
-    color: #452daf;
-    font-weight: normal;
+    font-weight: 400;
+    letter-spacing: -0.3px;
+    color: #452DAF;
+    margin: 0;
 }
 
 .kab-service-duration,
@@ -130,12 +142,6 @@
 
 .kab-category-item.selected {
     background-color: #d9d6e5;
-}
-
-.kab-category-name {
-    font-size: 18px;
-    color: #452daf;
-    font-weight: normal;
 }
 
 /* Specialists List */
@@ -178,10 +184,12 @@
 }
 
 .kab-specialist-name {
-    font-weight: 600;
+    font-family: "Playfair Display", Sans-serif;
+    font-weight: 400;
     font-size: 24px;
+    letter-spacing: -0.25px;
     margin-bottom: 5px;
-    color: #333;
+    color: #1D1C1F;
 }
 
 .kab-specialist-title {
@@ -191,11 +199,12 @@
 }
 
 .kab-specialist-description {
-    font-size: 14px;
-    line-height: 1.5;
-    color: #555;
-    max-height: 100px;
-    overflow-y: auto;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
+    color: #6B6970;
 }
 
 .kab-specialist-other-info {
@@ -417,10 +426,14 @@
 }
 
 .kab-time-slot {
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: -0.3px;
     border: none;
     border-radius: 8px;
     background-color: #e8e5f4;
-    color: #452daf;
+    color: #452DAF;
     padding: 6px 12px;
     text-align: center;
     cursor: pointer;
@@ -532,37 +545,52 @@
 }
 
 .kab-summary-content {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px 16px;
+    align-items: start;
 }
 
 .kab-summary-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 0;
+    display: contents;
 }
 
 .kab-summary-label {
-    font-weight: 600;
-    color: #333;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
+    color: #6B6970;
 }
 
 .kab-summary-value {
-    color: #333;
+    color: #1D1C1F;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
 }
 
 .kab-summary-price-item {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--kab-border-color);
+    display: contents;
+}
+
+.kab-summary-price-item .kab-summary-label {
+    margin-top: 8px;
+}
+
+.kab-summary-price-item .kab-summary-value {
+    margin-top: 8px;
 }
 
 .kab-summary-price {
-    font-size: 20px;
-    font-weight: 700;
-    color: #673AB7;
+    font-family: "Manrope", Sans-serif;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.3px;
+    color: #452DAF;
 }
 
 /* Personal Details Form */
@@ -650,12 +678,14 @@
     position: relative;
     gap: 15px;
     align-items: center;
+    margin-top: 20px;
 }
 
 /* Details step navigation - back button in separate row */
 .kab-details-navigation {
     display: flex;
     justify-content: center;
+    margin-top: 20px;
 }
 
 /* For steps with both prev and next buttons, we need space-between */
@@ -743,17 +773,16 @@
 
 .kab-success-icon,
 .kab-error-icon {
-    font-size: 48px;
     width: 80px;
     height: 80px;
-    line-height: 80px;
-    border-radius: 50%;
     margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.kab-success-icon {
-    background-color: var(--kab-success-color);
-    color: var(--kab-white);
+.kab-success-icon img {
+    align-items: center;
 }
 
 .kab-error-icon {
@@ -779,6 +808,52 @@
 .kab-booking-info-label {
     font-weight: 600;
     margin-right: 5px;
+}
+
+.kab-booking-message {
+    margin: 20px 0;
+    color: var(--kab-gray);
+    line-height: 1.6;
+}
+
+.kab-confirmation-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 30px;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.kab-book-new-btn,
+.kab-close-window-btn {
+    padding: 12px 30px;
+    border-radius: var(--kab-border-radius);
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    font-family: inherit;
+}
+
+.kab-book-new-btn {
+    background-color: var(--kab-primary-color);
+    color: var(--kab-white);
+}
+
+.kab-book-new-btn:hover {
+    background-color: var(--kab-primary-color-dark);
+}
+
+.kab-close-window-btn {
+    background-color: rgba(69, 45, 175, 0.1);
+    color: var(--kab-primary-color);
+}
+
+.kab-close-window-btn:hover {
+    background-color: rgba(69, 45, 175, 0.2);
 }
 
 /* Loading State */
@@ -941,4 +1016,19 @@
         align-items: center;
         flex-direction: column;
     }
+    .kab-form-step .kab-step-header h3 {
+        font-size: 24px;
+    }
+    .kab-form-step .kab-step-header p,
+    .kab-service-info p, 
+    .kab-category-name, 
+    .kab-specialist-description, 
+    .kab-summary-label, 
+    .kab-time-slot {
+        font-size: 16px;
+    }
+    .kab-specialist-name {
+        font-size: 20px;
+    }
+    
 }

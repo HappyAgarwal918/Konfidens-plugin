@@ -17,7 +17,7 @@
         constructor($form) {
             this.$form = $form;
             this.currentStep = 1;
-            this.maxStep = 6;
+            this.maxStep = 5; // Steps 1-5 are counted, step 6 (confirmation) is not
             
             this.serviceId = $form.data('service-id') || '';
             this.specialistId = $form.data('specialist-id') || '';
@@ -25,6 +25,7 @@
             this.selectedDate = '';
             this.selectedTime = '';
             this.services = []; // Store services data with prices
+            this.locations = []; // Store locations data
             this.specialists = []; // Store specialists data for random selection
             
             this.init();
@@ -149,6 +150,24 @@
                 self.goToStep(5);
             });
             
+            // Book new appointment button
+            this.$form.on('click', '.kab-book-new-btn', function() {
+                // Reset form and go back to step 1
+                self.resetForm();
+            });
+            
+            // Close window button
+            this.$form.on('click', '.kab-close-window-btn', function() {
+                // If in a popup, close it; otherwise, just hide the form or redirect
+                const $popup = self.$form.closest('.kab-popup');
+                if ($popup.length) {
+                    $popup.fadeOut(300);
+                } else {
+                    // If not in popup, could redirect to home or hide form
+                    window.location.href = '/';
+                }
+            });
+            
             // Random specialist selection button
             this.$form.on('click', '.kab-random-specialist-btn', function() {
                 self.selectRandomSpecialist();
@@ -180,7 +199,7 @@
                             html += `
                                 <div class="kab-service-item" data-service-id="${service.id}">
                                     <div class="kab-service-info">
-                                        <h4>${service.name}</h4>
+                                        <p>${service.name}</p>
                                     </div>
                                 </div>
                             `;
@@ -237,12 +256,15 @@
                 },
                 success: function(response) {
                     if (response.success && response.data.locations) {
+                        // Store locations data
+                        self.locations = response.data.locations;
+                        
                         let html = '';
                         
                         $.each(response.data.locations, function(index, location) {
                             html += `
                                 <div class="kab-category-item" data-location-id="${location.id}">
-                                    <div class="kab-category-name">${location.location_name}</div>
+                                    <p class="kab-category-name">${location.location_name}</p>
                                 </div>
                             `;
                         });
@@ -316,7 +338,7 @@
                                     : specialist.description;
                                 
                                 descriptionHtml = `
-                                    <div class="kab-specialist-description">${shortDesc}</div>
+                                    <p class="kab-specialist-description">${shortDesc}</p>
                                     ${specialist.description.length > maxLength ? '<a href="#" class="kab-read-more">Les mer</a>' : ''}
                                 `;
                             }
@@ -328,7 +350,7 @@
                                             <img src="${specialist.image_url || specialist.profile_image || specialist.image || 'https://via.placeholder.com/100'}" alt="${specialist.name}">
                                         </div>
                                         <div class="kab-specialist-info">
-                                            <div class="kab-specialist-name">${specialist.name}</div>
+                                            <h4 class="kab-specialist-name">${specialist.name}</h4>
                                             ${specialist.title ? `<div class="kab-specialist-title">${specialist.title}</div>` : ''}
                                             ${descriptionHtml}
                                         </div>
@@ -728,10 +750,16 @@
             // Show the target step
             this.$form.find(`.kab-form-step[data-step="${step}"]`).show();
             
-            // Update progress
-            const progressPercentage = (step / this.maxStep) * 100;
-            this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
-            this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
+            // Hide progress bar on confirmation step (step 6) - not counted in progress
+            if (step === 6) {
+                this.$form.find('.kab-form-progress').hide();
+            } else {
+                this.$form.find('.kab-form-progress').show();
+                // Update progress - only count steps 1-5 (step 6 is confirmation, not counted)
+                const progressPercentage = (step / this.maxStep) * 100;
+                this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
+                this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
+            }
             
             // Update current step
             this.currentStep = step;
@@ -990,7 +1018,15 @@
             if (this.serviceId) {
                 const $selectedService = this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`);
                 if ($selectedService.length) {
-                    serviceName = $selectedService.find('.kab-service-info h4').text();
+                    // Try p tag first (updated structure), fallback to h4 for backward compatibility
+                    serviceName = $selectedService.find('.kab-service-info p').text();
+                }
+                // If still empty, try to get from stored services data
+                if (!serviceName && this.services.length > 0) {
+                    const selectedService = this.services.find(service => service.id === this.serviceId);
+                    if (selectedService && selectedService.name) {
+                        serviceName = selectedService.name;
+                    }
                 }
             }
             
@@ -1000,6 +1036,23 @@
                 const $selectedTherapist = this.$form.find(`.kab-specialist-card[data-specialist-id="${this.specialistId}"]`);
                 if ($selectedTherapist.length) {
                     therapistName = $selectedTherapist.find('.kab-specialist-name').text();
+                }
+            }
+            
+            // Get location name
+            let locationName = '';
+            if (this.locationId) {
+                // First try to get from DOM
+                const $selectedLocation = this.$form.find(`.kab-category-item[data-location-id="${this.locationId}"]`);
+                if ($selectedLocation.length) {
+                    locationName = $selectedLocation.find('.kab-category-name').text().trim();
+                }
+                // If still empty, try to get from stored locations data
+                if (!locationName && this.locations.length > 0) {
+                    const selectedLocation = this.locations.find(location => location.id == this.locationId);
+                    if (selectedLocation && selectedLocation.location_name) {
+                        locationName = selectedLocation.location_name;
+                    }
                 }
             }
             
@@ -1057,7 +1110,7 @@
             // Update summary fields
             this.$form.find('.kab-summary-therapist').text(therapistName);
             this.$form.find('.kab-summary-service').text(serviceName);
-            this.$form.find('.kab-summary-location').text('Online Video Samtale');
+            this.$form.find('.kab-summary-location').text(locationName);
             this.$form.find('.kab-summary-date').text(formattedDate);
             this.$form.find('.kab-summary-time').text(formattedTime);
             this.$form.find('.kab-summary-price').text(price);
@@ -1140,6 +1193,7 @@
                     action: 'kab_create_booking',
                     service_id: this.serviceId,
                     specialist_id: this.specialistId,
+                    location_id: this.locationId, // Include location_id
                     timeslot: this.selectedTime,
                     first_name: firstName,
                     last_name: lastName,
@@ -1166,12 +1220,7 @@
                         
                         $success.find('.kab-booking-details').html(bookingDetails);
                         
-                        // Redirect if URL provided
-                        if (response.data.redirect_url) {
-                            setTimeout(function() {
-                                window.location.href = response.data.redirect_url;
-                            }, 2000);
-                        }
+                        // No redirect - stay on confirmation step
                     } else {
                         $error.show();
                         $error.find('.kab-error-message').text(response.data.message);

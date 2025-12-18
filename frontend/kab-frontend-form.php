@@ -179,6 +179,11 @@ function kab_get_all_therapists_ajax() {
                 $therapist['stored_tags'] = $stored_tags;
             }
             
+            // Check if therapist has locations assigned
+            $therapist_locations = kab_get_specialist_locations($therapist['id']);
+            $therapist['has_locations'] = !empty($therapist_locations);
+            $therapist['location_ids'] = $therapist_locations;
+            
             $therapists_array[] = $therapist;
         }
     }
@@ -540,32 +545,95 @@ function kab_create_booking() {
     $service_name = isset($service['name']) ? $service['name'] : '';
     $specialist_name = isset($specialist['name']) ? $specialist['name'] : '';
     
-    // Parse timeslot
-    $timeslot_parts = explode('T', $timeslot);
-    $timeslot_date = isset($timeslot_parts[0]) ? $timeslot_parts[0] : '';
-    $timeslot_time = isset($timeslot_parts[1]) ? substr($timeslot_parts[1], 0, 5) : '';
+    // The timeslot is actually a booking_token (JWT token from API)
+    // We need to extract the actual datetime from it for local storage
+    $booking_token = $timeslot;
     
-    // Create booking in API
+    // Try to decode the booking_token to get the actual datetime
+    // The token is base64 encoded JSON with startsAt field
+    $timeslot_date = '';
+    $timeslot_time = '';
+    if (!empty($booking_token)) {
+        // Try to decode the JWT token (it's base64 encoded JSON)
+        $decoded = base64_decode($booking_token, true);
+        if ($decoded !== false) {
+            $token_data = json_decode($decoded, true);
+            if (isset($token_data['startsAt'])) {
+                $starts_at = $token_data['startsAt'];
+                $timeslot_parts = explode('T', $starts_at);
+                $timeslot_date = isset($timeslot_parts[0]) ? $timeslot_parts[0] : '';
+                $timeslot_time = isset($timeslot_parts[1]) ? substr($timeslot_parts[1], 0, 5) : '';
+            }
+        }
+        
+        // Fallback: if decoding fails, try to parse as ISO datetime string
+        if (empty($timeslot_date) && strpos($booking_token, 'T') !== false) {
+            $timeslot_parts = explode('T', $booking_token);
+            $timeslot_date = isset($timeslot_parts[0]) ? $timeslot_parts[0] : '';
+            $timeslot_time = isset($timeslot_parts[1]) ? substr($timeslot_parts[1], 0, 5) : '';
+        }
+    }
+    
+    // Create booking in API - match the old plugin format exactly
+    // The old plugin only sends booking_token and patient_data (no service_id, specialist_id, location_id, or clinic_id)
+    // The booking_token already contains all necessary information encoded in it
     $booking_data = array(
-        'service_id' => $service_id,
-        'specialist_id' => $specialist_id,
-        'starts_at' => $timeslot,
-        'patient' => array(
+        'booking_token' => $booking_token, // Only booking_token, no other IDs needed
+        'patient_data' => array(
             'first_name' => $first_name,
             'last_name' => $last_name,
             'email' => $email,
-            'phone' => $phone,
-            'notes' => $notes
+            'mobile_number' => $phone // Old plugin uses 'mobile_number' instead of 'phone'
+            // Notes are not included in the old plugin format
         )
     );
     
-    $booking_response = kab_api_request('bookings', array_merge(
-        array('clinic_id' => get_option('kab_clinic_id', '')),
-        $booking_data
-    ), 'POST');
+    // Log booking data for debugging
+    error_log('Booking Request Data: ' . print_r($booking_data, true));
+    
+    // The old plugin does NOT include clinic_id in the request body
+    // It's only in the API key header
+    $booking_response = kab_api_request('bookings', $booking_data, 'POST');
+    
+    // Log API response for debugging
+    error_log('Booking API Response: ' . print_r($booking_response, true));
+    if (isset($booking_response['data']) && is_array($booking_response['data'])) {
+        error_log('Booking API Response Data: ' . print_r($booking_response['data'], true));
+        // Check for validation errors
+        if (isset($booking_response['data']['errors'])) {
+            error_log('Booking API Validation Errors: ' . print_r($booking_response['data']['errors'], true));
+        }
+    }
     
     if ($booking_response['success'] && !empty($booking_response['data'])) {
-        $booking_id = $booking_response['data']['id'];
+        // Get booking ID from response - old plugin expects 'booking_id' field
+        $booking_id = '';
+        $patient_data = null;
+        
+        if (is_array($booking_response['data'])) {
+            // Check for booking_id (old plugin format)
+            $booking_id = isset($booking_response['data']['booking_id']) ? $booking_response['data']['booking_id'] : '';
+            // Also check for 'id' as fallback
+            if (empty($booking_id) && isset($booking_response['data']['id'])) {
+                $booking_id = $booking_response['data']['id'];
+            }
+            // Get patient_data if available
+            $patient_data = isset($booking_response['data']['patient_data']) ? $booking_response['data']['patient_data'] : null;
+        } elseif (is_string($booking_response['data'])) {
+            // If data is a string, try to decode it
+            $decoded = json_decode($booking_response['data'], true);
+            if ($decoded) {
+                $booking_id = isset($decoded['booking_id']) ? $decoded['booking_id'] : (isset($decoded['id']) ? $decoded['id'] : '');
+                $patient_data = isset($decoded['patient_data']) ? $decoded['patient_data'] : null;
+            }
+        }
+        
+        if (empty($booking_id)) {
+            // Log the response for debugging
+            error_log('Booking API Response (no ID): ' . print_r($booking_response, true));
+            wp_send_json_error(array('message' => __('Booking created but could not retrieve booking ID. Please contact support.', 'konfidens-appointment-booking')));
+            return;
+        }
         
         // Save booking in local database
         $local_booking_data = array(
@@ -588,20 +656,70 @@ function kab_create_booking() {
         // Send email notification
         kab_send_booking_notification($local_booking_data);
         
-        // Return success with booking details
+        // Return success with booking details (no redirect - stay on confirmation step)
         wp_send_json_success(array(
             'message' => __('Booking created successfully.', 'konfidens-appointment-booking'),
-            'booking_id' => $booking_id,
-            'redirect_url' => home_url('/booking/thanks') . '?' . http_build_query(array(
-                'serviceId' => $service_id,
-                'serviceTitle' => $service_name,
-                'practitionerId' => $specialist_id,
-                'startsAt' => $timeslot,
-                'bookingId' => $booking_id
-            ))
+            'booking_id' => $booking_id
         ));
     } else {
-        $error_message = isset($booking_response['message']) ? $booking_response['message'] : __('Failed to create booking. Please try again.', 'konfidens-appointment-booking');
+        // Get detailed error message from API response
+        $error_message = __('Failed to create booking. Please try again.', 'konfidens-appointment-booking');
+        
+        // Try to extract error message from various possible locations in the response
+        if (isset($booking_response['message'])) {
+            $error_message = $booking_response['message'];
+        }
+        
+        // Check response data for error details
+        if (isset($booking_response['data'])) {
+            if (is_array($booking_response['data'])) {
+                // Check for validation errors (common in Laravel/API responses)
+                if (isset($booking_response['data']['errors']) && is_array($booking_response['data']['errors'])) {
+                    $validation_errors = array();
+                    foreach ($booking_response['data']['errors'] as $field => $messages) {
+                        if (is_array($messages)) {
+                            // Handle nested arrays (like _errors array)
+                            if (isset($messages['_errors']) && is_array($messages['_errors'])) {
+                                foreach ($messages['_errors'] as $error_msg) {
+                                    $validation_errors[] = $field . ': ' . $error_msg;
+                                }
+                            } else {
+                                // Regular array of messages
+                                $validation_errors[] = $field . ': ' . implode(', ', $messages);
+                            }
+                        } else {
+                            $validation_errors[] = $field . ': ' . $messages;
+                        }
+                    }
+                    if (!empty($validation_errors)) {
+                        $error_message = __('Validation error: ', 'konfidens-appointment-booking') . implode('; ', $validation_errors);
+                    }
+                }
+                // Check for message field
+                if (isset($booking_response['data']['message'])) {
+                    $error_message = $booking_response['data']['message'];
+                }
+                // Check for error field
+                if (isset($booking_response['data']['error'])) {
+                    $error_message = $booking_response['data']['error'];
+                }
+                // Check for error_message field
+                if (isset($booking_response['data']['error_message'])) {
+                    $error_message = $booking_response['data']['error_message'];
+                }
+            } elseif (is_string($booking_response['data'])) {
+                $error_message = $booking_response['data'];
+            }
+        }
+        
+        // Include HTTP code if available
+        if (isset($booking_response['code'])) {
+            $error_message .= ' (HTTP ' . $booking_response['code'] . ')';
+        }
+        
+        // Log error for debugging
+        error_log('Booking API Error: ' . print_r($booking_response, true));
+        
         wp_send_json_error(array('message' => $error_message));
     }
 }

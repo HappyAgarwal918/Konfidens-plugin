@@ -25,9 +25,9 @@ $form_classes[] = 'kab-context-' . $context;
     data-specialist-id="<?php echo esc_attr($preselected_specialist); ?>">
     
     <div class="kab-form-progress">
-        <div class="kab-progress-text">1/6</div>
+        <div class="kab-progress-text">1/5</div>
         <div class="kab-progress-bar">
-            <div class="kab-progress-fill" style="width: 16.67%"></div>
+            <div class="kab-progress-fill" style="width: 20%"></div>
         </div>
     </div>
     
@@ -192,10 +192,16 @@ $form_classes[] = 'kab-context-' . $context;
                 <div class="kab-confirmation-message">
                     <div class="kab-loading"><?php _e('Processing your booking...', 'konfidens-appointment-booking'); ?></div>
                     <div class="kab-success" style="display: none;">
-                        <div class="kab-success-icon">✓</div>
-                        <h3><?php _e('Booking Confirmed!', 'konfidens-appointment-booking'); ?></h3>
-                        <p class="kab-booking-message"></p>
+                        <div class="kab-success-icon">
+                            <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
+                        </div>
+                        <h3><?php _e('Du har bestilt din samtale!', 'konfidens-appointment-booking'); ?></h3>
+                        <p class="kab-booking-message"><?php _e('Vi har sendt deg en bekreftelse på e-post. Vennligst sjekk innboksen din for å bekrefte at alle opplysningene stemmer.', 'konfidens-appointment-booking'); ?></p>
                         <div class="kab-booking-details"></div>
+                        <div class="kab-confirmation-buttons">
+                            <button class="kab-book-new-btn"><?php _e('Bestill en ny time', 'konfidens-appointment-booking'); ?></button>
+                            <button class="kab-close-window-btn"><?php _e('Lukk vindu', 'konfidens-appointment-booking'); ?></button>
+                        </div>
                     </div>
                     <div class="kab-error" style="display: none;">
                         <div class="kab-error-icon">✗</div>

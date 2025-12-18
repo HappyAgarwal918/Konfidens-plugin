@@ -205,7 +205,9 @@ $form_classes[] = 'kab-context-' . $context;
                 <div class="kab-confirmation-message">
                     <div class="kab-loading"><?php _e('Processing your booking...', 'konfidens-appointment-booking'); ?></div>
                     <div class="kab-success" style="display: none;">
-                        <div class="kab-success-icon">✓</div>
+                        <div class="kab-success-icon">
+                            <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
+                        </div>
                         <h3><?php _e('Du har bestilt din samtale!', 'konfidens-appointment-booking'); ?></h3>
                         <p class="kab-booking-message"><?php _e('Vi har sendt deg en bekreftelse på e-post. Vennligst sjekk innboksen din for å bekrefte at alle opplysningene stemmer.', 'konfidens-appointment-booking'); ?></p>
                         <div class="kab-booking-details"></div>
