@@ -74,7 +74,7 @@
     font-family: "Manrope", Sans-serif;
     font-size: 18px;
     font-weight: 400;
-    letter-spacing: .0.3px;
+    letter-spacing: -0.3px;
     color: #1D1C1F;
 }
 
@@ -89,7 +89,6 @@
     padding: 12px 24px;
     cursor: pointer;
     transition: all 0.3s ease;
-    text-align: center;
     background-color: #e8e5f4;
     border-radius: 8px;
 }
@@ -205,13 +204,14 @@
     line-height: 145%;
     letter-spacing: -0.3px;
     color: #6B6970;
+    margin: 0;
 }
 
 .kab-specialist-other-info {
     display: flex;
     gap: 10px;
     justify-content: space-between;
-    align-items: flex-end;
+    margin-top: 20px;
 }
 /* Therapist tags */
 .kab-therapist-tag {
@@ -228,8 +228,12 @@
 /* Les mer link */
 .kab-read-more {
     color: #452daf;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
     text-decoration: none;
-    font-weight: 500;
     display: inline-block;
 }
 
@@ -334,19 +338,22 @@
 }
 
 .kab-select-specialist-btn {
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
     background-color: #452daf;
-    color: #f5f5f7;
+    color: #F5F5F7;
     border: none;
     border-radius: 8px;
     padding: 12px 24px;
     cursor: pointer;
-    font-weight: 500;
     transition: background-color 0.3s;
-    margin-top: 15px;
 }
 
 .kab-select-specialist-btn:hover {
-    background-color: #5e35b1;
+    background-color: #452daf;
 }
 
 /* Therapist selection grid for therapist-first form step 0 */
@@ -403,12 +410,6 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 20px;
-}
-
-.kab-date-picker-container {
-    border: 1px solid var(--kab-border-color);
-    border-radius: var(--kab-border-radius);
-    padding: 15px;
 }
 
 .kab-time-slots-container h4 {
@@ -481,13 +482,16 @@
 }
 
 .kab-weekdays {
+    font-family: "Manrope", Sans-serif;
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 5px;
     margin-bottom: 5px;
     text-align: center;
-    font-weight: 600;
-    font-size: 12px;
+    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: -0.2px;
+    color: #6b6970;
 }
 
 .kab-days {
@@ -497,8 +501,12 @@
 }
 
 .kab-day {
-    height: 30px;
-    line-height: 30px;
+    font-family: "Manrope", Sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: -0.2px;
+    height: 40px;
+    line-height: 40px;
     text-align: center;
     border-radius: var(--kab-border-radius);
     cursor: pointer;
@@ -674,7 +682,6 @@
 /* Form Navigation */
 .kab-form-navigation {
     display: flex;
-    justify-content: center;
     position: relative;
     gap: 15px;
     align-items: center;
@@ -684,7 +691,6 @@
 /* Details step navigation - back button in separate row */
 .kab-details-navigation {
     display: flex;
-    justify-content: center;
     margin-top: 20px;
 }
 
@@ -894,7 +900,7 @@
 
 .kab-popup-content {
     position: relative;
-    max-width: 850px;
+    max-width: 920px;
     max-height: 680px;
     overflow-y: auto;
     background-color: var(--kab-white);
