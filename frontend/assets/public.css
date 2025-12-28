@@ -85,6 +85,19 @@
     gap: 15px;
 }
 
+/* Step Section (for combined steps) */
+.kab-step-section {
+    margin-bottom: 30px;
+}
+
+.kab-step-section h4 {
+    font-family: "Playfair Display", Sans-serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: #1D1C1F;
+    margin-bottom: 15px;
+}
+
 .kab-service-item {
     padding: 12px 24px;
     cursor: pointer;

@@ -1,25 +1,31 @@
 /**
- * Public JavaScript for Konfidens Appointment Booking
+ * Public JavaScript for Konfidens Appointment Booking - Service & Therapist First Flow
+ * Step order: Service -> Therapist -> Location -> Date&Time -> Personal Details -> Confirmation
  */
 
 (function($) {
     'use strict';
 
     /**
-     * Booking Form Class
+     * Booking Form Class for Service & Therapist First Flow
      */
-    class KABBookingForm {
+    class KABServiceTherapistFirstBookingForm {
         /**
-         * Initialize the booking form
+         * Initialize the service & therapist first booking form
          * 
          * @param {jQuery} $form The booking form element
          */
         constructor($form) {
             this.$form = $form;
-            this.currentStep = 1;
-            this.maxStep = 5; // Steps 1-5 are counted, step 6 (confirmation) is not
+            this.currentStep = 0; // Start at 0, will be set to 1 when services load
+            this.maxStep = 4; // Steps 1-4 are counted (Therapist, Location, Date&Time, Personal Details), step 5 (confirmation) is not
             
+            // Service is always required and pre-selected
             this.serviceId = $form.data('service-id') || '';
+            if (!this.serviceId) {
+                console.error('Service ID is required for service-therapist-first booking form');
+            }
+            
             this.specialistId = $form.data('specialist-id') || '';
             this.locationId = '';
             this.selectedDate = '';
@@ -38,21 +44,15 @@
             // Hide all steps initially
             this.$form.find('.kab-form-step').hide();
             
-            // If serviceId is set, go directly to step 2, otherwise show step 1
-            if (this.serviceId) {
-                this.goToStep(2);
-            } else {
-                this.goToStep(1);
-            }
+            // Set current step to 0 initially (will go to 1 after services load)
+            this.currentStep = 0;
             
+            // Initialize events first
             this.initEvents();
-            this.loadServices();
             
-            // If specialist ID is preselected
-            if (this.specialistId) {
-                // Will be handled after services are loaded
-                this.preselectedSpecialist = true;
-            }
+            // Load services (service is always pre-selected from shortcode)
+            // After services load, form will go to step 1 (therapist selection)
+            this.loadServices();
         }
         
         /**
@@ -67,22 +67,39 @@
                 self.selectService(serviceId);
             });
             
+            // Specialist selection - clicking card just selects, doesn't auto-advance
+            this.$form.on('click', '.kab-specialist-card', function(e) {
+                // Don't trigger if clicking the button inside the card
+                if ($(e.target).closest('.kab-select-specialist-btn').length) {
+                    return;
+                }
+                const specialistId = $(this).data('specialist-id');
+                self.selectSpecialist(specialistId);
+                // Don't auto-advance - user must click button or next button
+            });
+            
+            // Random specialist selection button
+            this.$form.on('click', '.kab-random-specialist-btn', function() {
+                self.selectRandomSpecialist();
+            });
+            
             // Category selection
             this.$form.on('click', '.kab-category-item', function() {
                 const locationId = $(this).data('location-id');
                 self.selectLocation(locationId);
             });
             
-            // Specialist selection
-            this.$form.on('click', '.kab-specialist-card', function() {
-                const specialistId = $(this).data('specialist-id');
-                self.selectSpecialist(specialistId);
-            });
-            
-            // Day selection
-            this.$form.on('click', '.kab-day:not(.empty):not(.disabled)', function() {
-                const date = $(this).data('date');
-                self.selectDate(date);
+            // Day selection - use event delegation to handle dynamically rendered calendar
+            this.$form.on('click', '.kab-day:not(.empty):not(.disabled)', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Try both data() and attr() to ensure we get the date
+                const date = $(this).data('date') || $(this).attr('data-date');
+                if (date) {
+                    self.selectDate(date);
+                } else {
+                    console.error('No date found on clicked day element');
+                }
             });
             
             // Time slot selection
@@ -92,27 +109,21 @@
             });
             
             // Navigation buttons
-            this.$form.on('click', '.kab-next-btn', function() {
-                if ($(this).prop('disabled')) return;
-                self.nextStep();
-            });
-            
             this.$form.on('click', '.kab-prev-btn', function() {
                 self.prevStep();
             });
             
-            // Form submission - handle button click since there's no form element
+            // Form submission
             this.$form.on('click', '.kab-submit-btn', function(e) {
                 e.preventDefault();
                 
                 // Validate form fields first
-                const firstName = self.$form.find('#kab-first-name').val();
-                const lastName = self.$form.find('#kab-last-name').val() || ''; // Last name is optional
-                const email = self.$form.find('#kab-email').val();
-                const phone = self.$form.find('#kab-phone').val();
-                const terms = self.$form.find('#kab-terms').is(':checked');
+                const firstName = self.$form.find('#kab-first-name-stf').val();
+                const email = self.$form.find('#kab-email-stf').val();
+                const phone = self.$form.find('#kab-phone-stf').val();
+                const terms = self.$form.find('#kab-terms-stf').is(':checked');
                 
-                // Check if all required fields are filled (last name is optional)
+                // Check if all required fields are filled
                 if (!firstName || !email || !phone) {
                     alert('Please fill in all required fields.');
                     return false;
@@ -132,45 +143,37 @@
                 }
                 
                 // If validation passes, go to confirmation step and submit
-                self.goToStep(6);
+                self.goToStep(5);
                 self.submitBooking();
                 return false;
             });
             
-            // Form submission (fallback for actual form elements)
+            // Form submission (fallback)
             this.$form.on('submit', function(e) {
                 e.preventDefault();
+                self.goToStep(5);
                 self.submitBooking();
-                self.goToStep(6);
                 return false;
             });
             
             // Try again button
             this.$form.on('click', '.kab-try-again-btn', function() {
-                self.goToStep(5);
+                self.goToStep(4);
             });
             
             // Book new appointment button
             this.$form.on('click', '.kab-book-new-btn', function() {
-                // Reset form and go back to step 1
                 self.resetForm();
             });
             
             // Close window button
             this.$form.on('click', '.kab-close-window-btn', function() {
-                // If in a popup, close it; otherwise, just hide the form or redirect
                 const $popup = self.$form.closest('.kab-popup');
                 if ($popup.length) {
                     $popup.fadeOut(300);
                 } else {
-                    // If not in popup, could redirect to home or hide form
                     window.location.href = '/';
                 }
-            });
-            
-            // Random specialist selection button
-            this.$form.on('click', '.kab-random-specialist-btn', function() {
-                self.selectRandomSpecialist();
             });
         }
         
@@ -181,6 +184,8 @@
             const self = this;
             const $servicesList = this.$form.find('.kab-services-list');
             
+            $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
             $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
@@ -190,14 +195,13 @@
                 },
                 success: function(response) {
                     if (response.success && response.data.services) {
-                        // Store services data for later use (including prices)
                         self.services = response.data.services;
                         
                         let html = '';
-                        
                         $.each(response.data.services, function(index, service) {
+                            const isSelected = self.serviceId == service.id ? 'selected' : '';
                             html += `
-                                <div class="kab-service-item" data-service-id="${service.id}">
+                                <div class="kab-service-item ${isSelected}" data-service-id="${service.id}">
                                     <div class="kab-service-info">
                                         <p>${service.name}</p>
                                     </div>
@@ -207,81 +211,23 @@
                         
                         $servicesList.html(html);
                         
-                        // If service is preselected
+                        // Service is always pre-selected, mark it
                         if (self.serviceId) {
                             self.$form.find(`.kab-service-item[data-service-id="${self.serviceId}"]`).addClass('selected');
-                            self.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
-                            // Navigate to location step (step 2) without skipping it
-                            setTimeout(() => {
-                                self.goToStep(2);
-                            }, 100);
                         }
                         
-                        // If specialist is preselected
-                        if (self.preselectedSpecialist && self.specialistId) {
-                            // Get the first service
-                            if (!self.serviceId && response.data.services.length > 0) {
-                                self.serviceId = response.data.services[0].id;
-                                self.$form.find(`.kab-service-item[data-service-id="${self.serviceId}"]`).addClass('selected');
-                                self.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
-                            }
-                            self.goToStep(2);
+                        // Now that services are loaded, show step 1 (therapist selection)
+                        // This ensures we don't try to load specialists before services are ready
+                        // Only go to step 1 if we're still on step 0 (initial state)
+                        if (self.currentStep === 0) {
+                            self.goToStep(1);
                         }
                     } else {
-                        $servicesList.html('<div class="kab-no-data">' + kab_vars.no_services + '</div>');
+                        $servicesList.html('<div class="kab-no-data">' + (response.data?.message || kab_vars.no_services) + '</div>');
                     }
                 },
                 error: function() {
                     $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
-                }
-            });
-        }
-        
-        /**
-         * Load locations
-         */
-        loadCategories() {
-            const self = this;
-            const $categoriesList = this.$form.find('.kab-categories-list');
-            
-            $categoriesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
-            
-            $.ajax({
-                url: kab_vars.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'kab_get_locations',
-                    service_id: this.serviceId,
-                    nonce: kab_vars.nonce
-                },
-                success: function(response) {
-                    if (response.success && response.data.locations) {
-                        // Store locations data
-                        self.locations = response.data.locations;
-                        
-                        let html = '';
-                        
-                        $.each(response.data.locations, function(index, location) {
-                            html += `
-                                <div class="kab-category-item" data-location-id="${location.id}">
-                                    <p class="kab-category-name">${location.location_name}</p>
-                                </div>
-                            `;
-                        });
-                        
-                        $categoriesList.html(html);
-                        
-                        // If we have a preselected specialist, auto-select the first category
-                        if (self.preselectedSpecialist && self.specialistId && response.data.locations.length > 0) {
-                            self.selectLocation(response.data.locations[0].id);
-                            self.nextStep();
-                        }
-                    } else {
-                        $categoriesList.html('<div class="kab-no-data">No locations available for this service.</div>');
-                    }
-                },
-                error: function() {
-                    $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
         }
@@ -301,7 +247,6 @@
                 data: {
                     action: 'kab_get_specialists',
                     service_id: this.serviceId,
-                    location_id: this.locationId,
                     specialist_id: this.specialistId,
                     nonce: kab_vars.nonce
                 },
@@ -317,7 +262,7 @@
                         sliderHtml += '<div class="kab-slider-arrow kab-slider-next"><img src="' + kab_vars.plugin_url + 'frontend/assets/images/arrow-right.png" alt="Flere terapeuter"></div>';
                         
                         $.each(response.data.specialists, function(index, specialist) {
-                            // Extract tags from specialist data (could be from categories, specialties, or other fields)
+                            // Extract tags from specialist data
                             let tagsHtml = '';
                             const tags = self.getSpecialistTags(specialist);
                             
@@ -361,31 +306,37 @@
                                     </div>
                                 </div>
                             `;
-                            
-                            // No dots needed
                         });
                         
                         sliderHtml += '</div>';
-                        
                         $specialistsList.html(sliderHtml);
                         
-                        // Initialize slider functionality with a slight delay to ensure DOM is ready
+                        // Initialize slider functionality
                         setTimeout(() => {
                             self.initSpecialistSlider();
                         }, 100);
                         
-                        // If we have a preselected specialist, select it
+                        // If we have a preselected specialist, select it (but NEVER auto-advance)
                         if (self.specialistId) {
-                            self.selectSpecialist(self.specialistId);
-                            
-                            if (self.preselectedSpecialist) {
-                                self.preselectedSpecialist = false;
-                                self.nextStep();
-                            }
-                        } else {
-                            // Enable next button anyway - we'll auto-select if needed
-                            self.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', false);
+                            // Select specialist WITHOUT auto-advance - form must stay on step 1
+                            // Use setTimeout to ensure this happens after any other async operations
+                            setTimeout(() => {
+                                self.selectSpecialist(self.specialistId, false);
+                                // CRITICAL: Force stay on step 1 - never auto-advance when pre-selected
+                                if (self.currentStep !== 1) {
+                                    self.goToStep(1);
+                                }
+                            }, 100);
                         }
+                        
+                        // CRITICAL: Ensure we're still on step 1 after loading specialists
+                        // This prevents any accidental auto-advance to step 2
+                        // Force stay on step 1 - user must manually proceed
+                        setTimeout(() => {
+                            if (self.currentStep !== 1) {
+                                self.goToStep(1);
+                            }
+                        }, 150);
                     } else {
                         $specialistsList.html('<div class="kab-no-data">' + kab_vars.no_specialists + '</div>');
                     }
@@ -398,19 +349,14 @@
         
         /**
          * Extract tags from specialist data
-         * 
-         * @param {Object} specialist The specialist data object
-         * @returns {Array} Array of tag strings
          */
         getSpecialistTags(specialist) {
             const tags = [];
             
-            // 1. First priority: Check for stored tags from database (admin-managed)
             if (specialist.stored_tags && Array.isArray(specialist.stored_tags) && specialist.stored_tags.length > 0) {
                 return specialist.stored_tags;
             }
             
-            // 2. Second priority: Check for categories/specialties directly in the specialist object (from API)
             if (specialist.categories && Array.isArray(specialist.categories)) {
                 specialist.categories.forEach(category => {
                     if (typeof category === 'string') {
@@ -421,7 +367,6 @@
                 });
             }
             
-            // 3. Third priority: Check for specialties (from API)
             if (specialist.specialties && Array.isArray(specialist.specialties)) {
                 specialist.specialties.forEach(specialty => {
                     if (typeof specialty === 'string') {
@@ -430,17 +375,6 @@
                         tags.push(specialty.name);
                     }
                 });
-            }
-            
-            // 4. Last resort: If no tags found, add some default tags
-            if (tags.length === 0) {
-                // These are example tags from the screenshot
-                const defaultTags = ['Angst', 'Utbrenthet', 'Selvfølelse/selvbilde', 'Psykiske utfordringer', 'Personlig vekst'];
-                
-                // Add 2-4 random tags to make it look natural
-                const numTags = Math.floor(Math.random() * 3) + 2; // 2-4 tags
-                const shuffled = [...defaultTags].sort(() => 0.5 - Math.random());
-                return shuffled.slice(0, numTags);
             }
             
             return tags;
@@ -456,50 +390,37 @@
             const $prevBtn = this.$form.find('.kab-slider-prev');
             const $nextBtn = this.$form.find('.kab-slider-next');
             
-            // If there are no cards, return early
-            if ($cards.length === 0) {
-                console.log('No specialist cards found');
-                return;
-            }
+            if ($cards.length === 0) return;
             
             let currentIndex = 0;
             const totalSlides = $cards.length;
             
-            console.log(`Initializing slider with ${totalSlides} specialists`);
-            
-            // Show only the first card initially
             $cards.hide().eq(currentIndex).show();
             
-            // Update slider function with animation
             const updateSlider = () => {
                 $cards.fadeOut(200).promise().done(function() {
                     $cards.eq(currentIndex).fadeIn(200);
                 });
             };
             
-            // Handle next button click
             $nextBtn.on('click', function() {
                 currentIndex = (currentIndex + 1) % totalSlides;
                 updateSlider();
             });
             
-            // Handle previous button click
             $prevBtn.on('click', function() {
                 currentIndex = (currentIndex - 1 + totalSlides) % totalSlides;
                 updateSlider();
             });
             
-            // No dot clicks to handle
-            
-            // Handle select specialist button clicks - auto advance to next step
-            this.$form.off('click', '.kab-select-specialist-btn').on('click', '.kab-select-specialist-btn', function() {
+            // Handle select specialist button clicks - only advance when button is explicitly clicked by user
+            this.$form.off('click', '.kab-select-specialist-btn').on('click', '.kab-select-specialist-btn', function(e) {
+                e.preventDefault();
+                e.stopPropagation(); // Prevent event bubbling to card click
                 const specialistId = $(this).data('specialist-id');
-                self.selectSpecialist(specialistId);
-                
-                // Auto advance to next step after selecting therapist
-                setTimeout(() => {
-                    self.nextStep();
-                }, 300);
+                if (!specialistId) return;
+                // Pass autoAdvance=true to advance to next step ONLY when user clicks button
+                self.selectSpecialist(specialistId, true);
             });
             
             // Handle "Les mer" link clicks
@@ -510,13 +431,10 @@
                 const $card = $link.closest('.kab-specialist-card');
                 const specialistId = $card.data('specialist-id');
                 
-                // Get specialist from stored specialists array
                 const specialist = self.specialists.find(s => s.id === specialistId);
                 
                 if (specialist && specialist.description) {
-                    // Toggle between short and full description
                     if ($link.hasClass('expanded')) {
-                        // Show short description
                         const maxLength = 150;
                         const shortDesc = specialist.description.length > maxLength 
                             ? specialist.description.substring(0, maxLength) + '...' 
@@ -524,10 +442,100 @@
                         $description.text(shortDesc);
                         $link.text('Les mer').removeClass('expanded');
                     } else {
-                        // Show full description
                         $description.text(specialist.description);
                         $link.text('Vis mindre').addClass('expanded');
                     }
+                }
+            });
+        }
+        
+        /**
+         * Select a service
+         * @param {string} serviceId The service ID to select
+         * @param {boolean} autoAdvance Whether to automatically advance to next step (default: true)
+         */
+        selectService(serviceId, autoAdvance = true) {
+            this.serviceId = serviceId;
+            
+            // Update UI
+            this.$form.find('.kab-service-item').removeClass('selected');
+            this.$form.find(`.kab-service-item[data-service-id="${serviceId}"]`).addClass('selected');
+            
+            // Automatically proceed to next step (step 1 - specialist) if autoAdvance is true
+            if (autoAdvance) {
+                setTimeout(() => {
+                    this.goToStep(1);
+                }, 300);
+            }
+        }
+        
+        /**
+         * Select a specialist
+         * @param {string} specialistId Specialist ID
+         * @param {boolean} autoAdvance Whether to automatically advance to next step (default: false)
+         */
+        selectSpecialist(specialistId, autoAdvance = false) {
+            if (!specialistId) return;
+            
+            this.specialistId = specialistId;
+            
+            // Update UI
+            this.$form.find('.kab-specialist-card').removeClass('selected');
+            this.$form.find(`.kab-specialist-card[data-specialist-id="${specialistId}"]`).addClass('selected');
+            
+            // Enable the random specialist button (which acts as next button)
+            // Note: There's no .kab-next-btn in step 1, only .kab-random-specialist-btn
+            
+            // ONLY auto-advance if explicitly requested (user clicked the "Velg denne terapeuten" button)
+            // Never auto-advance when specialist is pre-selected or card is clicked
+            if (autoAdvance && this.currentStep === 1) {
+                // Double-check we're on step 1 before advancing
+                setTimeout(() => {
+                    if (this.currentStep === 1) {
+                        this.goToStep(2);
+                    }
+                }, 300);
+            }
+        }
+        
+        /**
+         * Load locations for therapist and service
+         */
+        loadCategories() {
+            const self = this;
+            const $categoriesList = this.$form.find('.kab-categories-list');
+            
+            $categoriesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_locations_for_therapist_service',
+                    service_id: this.serviceId,
+                    therapist_id: this.specialistId,
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data.locations) {
+                        self.locations = response.data.locations;
+                        
+                        let html = '';
+                        $.each(response.data.locations, function(index, location) {
+                            html += `
+                                <div class="kab-category-item" data-location-id="${location.id}">
+                                    <p class="kab-category-name">${location.location_name}</p>
+                                </div>
+                            `;
+                        });
+                        
+                        $categoriesList.html(html);
+                    } else {
+                        $categoriesList.html('<div class="kab-no-data">' + (response.data?.message || 'No locations available for this therapist and service combination.') + '</div>');
+                    }
+                },
+                error: function() {
+                    $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
         }
@@ -539,12 +547,6 @@
             const self = this;
             const $datePicker = this.$form.find('.kab-date-picker');
             const $timeSlots = this.$form.find('.kab-time-slots');
-            
-            // Ensure a therapist is selected before loading dates
-            if (!this.specialistId) {
-                $datePicker.html('<div class="kab-no-data">Please select a therapist first.</div>');
-                return;
-            }
             
             $datePicker.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             $timeSlots.html('');
@@ -560,43 +562,28 @@
                 },
                 success: function(response) {
                     if (response.success && response.data.dates && response.data.dates.length > 0) {
-                        // Create date picker
                         const today = new Date();
                         const currentMonth = today.getMonth();
                         const currentYear = today.getFullYear();
                         
                         $datePicker.html(self.createCalendar(currentMonth, currentYear, response.data.dates));
-                        
-                        // Add event handlers for month navigation
                         self.initMonthNavigation(response.data.dates);
                         
-                        // If we have a selected date and time slots from the response
                         if (response.data.selected_date) {
-                            // Set the selected date
                             self.selectedDate = response.data.selected_date;
                             const $selectedDateElement = $datePicker.find(`.kab-day[data-date="${response.data.selected_date}"]`);
                             if ($selectedDateElement.length) {
                                 $selectedDateElement.addClass('selected');
                             }
                             
-                            // If we have time slots HTML, display it
                             if (response.data.html_booking_slot) {
                                 $timeSlots.html(response.data.html_booking_slot);
-                                
-                                // Enable next button if we have time slots
-                                if ($timeSlots.find('.kab-time-slot').length > 0) {
-                                    self.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', false);
-                                    // No auto-selection of time slots - user must select manually
-                                }
                             }
                         } else {
-                            // If no selected date was returned, select the most recent available date immediately
                             if (response.data.dates.length > 0) {
-                                // Sort dates to find the most recent one
                                 const sortedDates = [...response.data.dates].sort();
                                 const todayStr = new Date().toISOString().split('T')[0];
                                 
-                                // Find the first date that is today or after today
                                 let nearestDate = sortedDates[0];
                                 for (const date of sortedDates) {
                                     if (date >= todayStr) {
@@ -605,7 +592,6 @@
                                     }
                                 }
                                 
-                                // Directly call selectDate instead of triggering click event
                                 self.selectDate(nearestDate);
                             }
                         }
@@ -623,35 +609,39 @@
         
         /**
          * Initialize month navigation
-         * 
-         * @param {Array} availableDates Array of available dates
          */
         initMonthNavigation(availableDates) {
             const self = this;
             const $datePicker = this.$form.find('.kab-date-picker');
             
-            // Handle month navigation
+            // Remove existing handlers to prevent duplicates
+            $datePicker.off('click', '.kab-month-prev, .kab-month-next');
+            
             $datePicker.on('click', '.kab-month-prev, .kab-month-next', function() {
                 const month = parseInt($(this).data('month'));
                 const year = parseInt($(this).data('year'));
                 
-                console.log(`Navigating to month: ${month}, year: ${year}`);
-                
-                // Update calendar
                 $datePicker.html(self.createCalendar(month, year, availableDates));
-                
-                // Re-initialize month navigation for the new calendar
                 self.initMonthNavigation(availableDates);
+                
+                // If we have a selected date, maintain the selection and reload time slots
+                if (self.selectedDate) {
+                    const $selectedDateElement = $datePicker.find(`.kab-day[data-date="${self.selectedDate}"]`);
+                    if ($selectedDateElement.length) {
+                        $selectedDateElement.addClass('selected');
+                        // Reload time slots for the selected date
+                        self.loadTimeSlots(self.selectedDate);
+                    }
+                }
             });
         }
         
         /**
-         * Create calendar
+         * Create calendar (Monday-first week)
          */
         createCalendar(month, year, availableDates) {
             const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             
-            // Calculate previous and next month
             const prevMonth = month === 0 ? 11 : month - 1;
             const prevYear = month === 0 ? year - 1 : year;
             const nextMonth = month === 11 ? 0 : month + 1;
@@ -665,29 +655,25 @@
                         <button class="kab-month-next" data-month="${nextMonth}" data-year="${nextYear}">&gt;</button>
                     </div>
                     <div class="kab-weekdays">
-                        <div>Sun</div>
                         <div>Mon</div>
                         <div>Tue</div>
                         <div>Wed</div>
                         <div>Thu</div>
                         <div>Fri</div>
                         <div>Sat</div>
+                        <div>Sun</div>
                     </div>
                     <div class="kab-days">
             `;
             
-            // Get first day of month
-            const firstDay = new Date(year, month, 1).getDay();
-            
-            // Get last day of month
+            const firstDayOfWeek = new Date(year, month, 1).getDay();
+            const firstDay = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
             const lastDay = new Date(year, month + 1, 0).getDate();
             
-            // Add empty cells for days before first day of month
             for (let i = 0; i < firstDay; i++) {
                 html += '<div class="kab-day empty"></div>';
             }
             
-            // Add days
             const today = new Date();
             const currentDate = today.getDate();
             const currentMonth = today.getMonth();
@@ -707,7 +693,6 @@
             }
             
             html += '</div></div>';
-            
             return html;
         }
         
@@ -715,15 +700,6 @@
          * Go to next step
          */
         nextStep() {
-            // Auto-select a therapist if we're on the therapist step and none is selected
-            if (this.currentStep === 3 && !this.specialistId) {
-                const $firstSpecialist = this.$form.find('.kab-specialist-card:first');
-                if ($firstSpecialist.length) {
-                    const specialistId = $firstSpecialist.data('specialist-id');
-                    this.selectSpecialist(specialistId);
-                }
-            }
-            
             if (this.currentStep < this.maxStep) {
                 this.goToStep(this.currentStep + 1);
             }
@@ -740,8 +716,6 @@
         
         /**
          * Go to specific step
-         * 
-         * @param {number} step Step number
          */
         goToStep(step) {
             // Hide all steps
@@ -750,15 +724,23 @@
             // Show the target step
             this.$form.find(`.kab-form-step[data-step="${step}"]`).show();
             
-            // Hide progress bar on confirmation step (step 6) - not counted in progress
-            if (step === 6) {
+            // Hide progress bar on confirmation step
+            if (step === 5) {
                 this.$form.find('.kab-form-progress').hide();
             } else {
                 this.$form.find('.kab-form-progress').show();
-                // Update progress - only count steps 1-5 (step 6 is confirmation, not counted)
                 const progressPercentage = (step / this.maxStep) * 100;
                 this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
                 this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
+            }
+            
+            // Hide/show back button based on step
+            if (step === 1) {
+                // Hide back button on first step (therapist selection)
+                this.$form.find('.kab-form-step[data-step="1"] .kab-prev-btn').hide();
+            } else {
+                // Show back button on all other steps
+                this.$form.find('.kab-form-step .kab-prev-btn').show();
             }
             
             // Update current step
@@ -770,85 +752,29 @@
         
         /**
          * Handle step change actions
-         * 
-         * @param {number} step Step number
          */
         handleStepChange(step) {
             switch (step) {
+                case 1:
+                    this.loadSpecialists();
+                    break;
                 case 2:
                     this.loadCategories();
                     break;
                 case 3:
-                    this.loadSpecialists();
-                    break;
-                case 4:
                     this.loadDatePicker();
                     break;
-                case 5:
+                case 4:
                     this.updateBookingSummary();
                     break;
-                case 6:
-                    this.submitBooking();
+                case 5:
+                    // Confirmation step - submitBooking will be called separately
                     break;
-            }
-        }
-        
-        /**
-         * Reset form to initial state
-         */
-        resetForm() {
-            // Reset all selections except serviceId and specialistId (they come from button)
-            this.locationId = '';
-            this.selectedDate = '';
-            this.selectedTime = '';
-            
-            // Reset UI selections
-            this.$form.find('.kab-service-item').removeClass('selected');
-            this.$form.find('.kab-category-item').removeClass('selected');
-            this.$form.find('.kab-date-item').removeClass('selected');
-            this.$form.find('.kab-time-slot').removeClass('selected');
-            
-            // Reset navigation buttons
-            this.$form.find('.kab-next-btn').prop('disabled', true);
-            this.$form.find('.kab-prev-btn').prop('disabled', false);
-            
-            // If service is preselected, go directly to step 2, otherwise step 1
-            if (this.serviceId) {
-                // Select the service visually
-                this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`).addClass('selected');
-                this.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
-                // Go directly to step 2 without showing step 1
-                this.goToStep(2);
-            } else {
-                this.goToStep(1);
-            }
-        }
-        
-        /**
-         * Select a service
-         * 
-         * @param {string} serviceId Service ID
-         * @param {boolean} autoAdvance Whether to automatically advance to next step (default: true)
-         */
-        selectService(serviceId, autoAdvance = true) {
-            this.serviceId = serviceId;
-            
-            // Update UI
-            this.$form.find('.kab-service-item').removeClass('selected');
-            this.$form.find(`.kab-service-item[data-service-id="${serviceId}"]`).addClass('selected');
-            
-            // Automatically proceed to next step if autoAdvance is true
-            if (autoAdvance) {
-                setTimeout(() => {
-                    this.nextStep();
-                }, 300); // Small delay for visual feedback
             }
         }
         
         /**
          * Select a location
-         * 
-         * @param {string} locationId Location ID
          */
         selectLocation(locationId) {
             this.locationId = locationId;
@@ -857,71 +783,31 @@
             this.$form.find('.kab-category-item').removeClass('selected');
             this.$form.find(`.kab-category-item[data-location-id="${locationId}"]`).addClass('selected');
             
-            // Automatically proceed to next step
+            // Automatically proceed to next step (step 3 - date)
             setTimeout(() => {
-                this.nextStep();
-            }, 300); // Small delay for visual feedback
-        }
-        
-        /**
-         * Select a specialist
-         * 
-         * @param {string} specialistId Specialist ID
-         */
-        selectSpecialist(specialistId) {
-            this.specialistId = specialistId;
-            
-            // Update UI
-            this.$form.find('.kab-specialist-card').removeClass('selected');
-            this.$form.find(`.kab-specialist-card[data-specialist-id="${specialistId}"]`).addClass('selected');
-            
-            // Enable next button
-            this.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', false);
-            
-            // If we're already on the date selection step, reload the date picker for this therapist
-            if (this.currentStep === 4) {
-                this.loadDatePicker();
-                // Clear any selected date and time
-                this.selectedDate = '';
-                this.selectedTime = '';
-                this.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', true);
-            }
-        }
-        
-        /**
-         * Select a random specialist from the list
-         */
-        selectRandomSpecialist() {
-            // Check if we have specialists loaded
-            if (!this.specialists || this.specialists.length === 0) {
-                console.warn('No specialists available for random selection');
-                return;
-            }
-            
-            // Select a random specialist
-            const randomIndex = Math.floor(Math.random() * this.specialists.length);
-            const randomSpecialist = this.specialists[randomIndex];
-            
-            // Select the random specialist
-            this.selectSpecialist(randomSpecialist.id);
-            
-            // Automatically advance to next step
-            setTimeout(() => {
-                this.nextStep();
+                this.goToStep(3);
             }, 300);
         }
         
         /**
          * Select a date
-         * 
-         * @param {string} date Selected date
          */
         selectDate(date) {
+            if (!date) {
+                console.error('No date provided to selectDate');
+                return;
+            }
+            
             this.selectedDate = date;
             
             // Update UI
             this.$form.find('.kab-day').removeClass('selected');
-            this.$form.find(`.kab-day[data-date="${date}"]`).addClass('selected');
+            const $selectedDay = this.$form.find(`.kab-day[data-date="${date}"]`);
+            if ($selectedDay.length) {
+                $selectedDay.addClass('selected');
+            } else {
+                console.warn('Date element not found for date:', date);
+            }
             
             // Load time slots
             this.loadTimeSlots(date);
@@ -929,35 +815,34 @@
         
         /**
          * Load time slots
-         * 
-         * @param {string} date Selected date
          */
         loadTimeSlots(date) {
             const self = this;
             const $timeSlots = this.$form.find('.kab-time-slots');
             
-            // Ensure a therapist is selected
+            // Validate required data
+            if (!this.serviceId) {
+                console.error('Service ID is required to load time slots');
+                $timeSlots.html('<div class="kab-no-data">Service is required.</div>');
+                return;
+            }
+            
             if (!this.specialistId) {
+                console.error('Specialist ID is required to load time slots');
                 $timeSlots.html('<div class="kab-no-data">Please select a therapist first.</div>');
+                return;
+            }
+            
+            if (!date) {
+                console.error('Date is required to load time slots');
+                $timeSlots.html('<div class="kab-no-data">Please select a date.</div>');
                 return;
             }
             
             $timeSlots.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             
-            // Display which therapist's schedule we're viewing
-            const $selectedTherapist = this.$form.find(`.kab-specialist-card[data-specialist-id="${this.specialistId}"]`);
-            let therapistName = "selected therapist";
-            if ($selectedTherapist.length) {
-                therapistName = $selectedTherapist.find('.kab-specialist-name').text() || therapistName;
-            }
-            
-            // Add therapist name to the time slots header
-            this.$form.find('.kab-time-slots-container h4').text('Available times for ' + therapistName);
-            
-            // Set the selected date
             this.selectedDate = date;
             
-            // Using AJAX to get HTML directly like the old plugin
             $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
@@ -969,29 +854,21 @@
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
-                    // The response is direct HTML, not JSON
-                    $timeSlots.html(response);
-                    
-                    // Enable next button if we have time slots
-                    if ($timeSlots.find('.kab-time-slot').length > 0) {
-                        self.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', false);
-                        // No auto-selection of time slots - user must select manually
+                    if (response) {
+                        $timeSlots.html(response);
                     } else {
-                        self.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', true);
+                        $timeSlots.html('<div class="kab-no-data">No time slots available for this date.</div>');
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error fetching time slots:', error);
+                    console.error('Error fetching time slots:', error, xhr.responseText);
                     $timeSlots.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
-                    self.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', true);
                 }
             });
         }
         
         /**
          * Select a time slot
-         * 
-         * @param {string} timeSlot Time slot
          */
         selectTimeSlot(timeSlot) {
             this.selectedTime = timeSlot;
@@ -1000,33 +877,22 @@
             this.$form.find('.kab-time-slot').removeClass('selected');
             this.$form.find(`.kab-time-slot[data-timeslot="${timeSlot}"]`).addClass('selected');
             
-            // Enable next button
-            this.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', false);
-            
-            // Auto-advance to next step after selecting time slot
+            // Auto-advance to next step
             setTimeout(() => {
                 this.nextStep();
             }, 300);
         }
         
         /**
-         * Update booking summary on the details page
+         * Update booking summary
          */
         updateBookingSummary() {
             // Get service name
             let serviceName = '';
-            if (this.serviceId) {
-                const $selectedService = this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`);
-                if ($selectedService.length) {
-                    // Try p tag first (updated structure), fallback to h4 for backward compatibility
-                    serviceName = $selectedService.find('.kab-service-info p').text();
-                }
-                // If still empty, try to get from stored services data
-                if (!serviceName && this.services.length > 0) {
-                    const selectedService = this.services.find(service => service.id === this.serviceId);
-                    if (selectedService && selectedService.name) {
-                        serviceName = selectedService.name;
-                    }
+            if (this.serviceId && this.services.length > 0) {
+                const selectedService = this.services.find(service => service.id == this.serviceId);
+                if (selectedService && selectedService.name) {
+                    serviceName = selectedService.name;
                 }
             }
             
@@ -1041,18 +907,10 @@
             
             // Get location name
             let locationName = '';
-            if (this.locationId) {
-                // First try to get from DOM
-                const $selectedLocation = this.$form.find(`.kab-category-item[data-location-id="${this.locationId}"]`);
-                if ($selectedLocation.length) {
-                    locationName = $selectedLocation.find('.kab-category-name').text().trim();
-                }
-                // If still empty, try to get from stored locations data
-                if (!locationName && this.locations.length > 0) {
-                    const selectedLocation = this.locations.find(location => location.id == this.locationId);
-                    if (selectedLocation && selectedLocation.location_name) {
-                        locationName = selectedLocation.location_name;
-                    }
+            if (this.locationId && this.locations.length > 0) {
+                const selectedLocation = this.locations.find(location => location.id == this.locationId);
+                if (selectedLocation && selectedLocation.location_name) {
+                    locationName = selectedLocation.location_name;
                 }
             }
             
@@ -1070,25 +928,20 @@
             // Format time
             let formattedTime = '';
             if (this.selectedTime) {
-                // Try to get time from the selected time slot element first
                 const $selectedTimeSlot = this.$form.find(`.kab-time-slot[data-timeslot="${this.selectedTime}"]`);
                 if ($selectedTimeSlot.length) {
                     formattedTime = $selectedTimeSlot.text().trim();
                 }
                 
-                // If we didn't get a valid time from the element, try parsing the selectedTime value
                 if (!formattedTime || formattedTime.length === 0 || !/^\d{1,2}:\d{2}$/.test(formattedTime)) {
                     if (this.selectedTime.includes('T')) {
-                        // ISO format: extract time part
                         const timePart = this.selectedTime.split('T')[1];
                         if (timePart) {
                             formattedTime = timePart.substring(0, 5);
                         }
                     } else if (this.selectedTime.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/)) {
-                        // Another ISO format
                         formattedTime = this.selectedTime.split('T')[1].substring(0, 5);
                     } else if (this.selectedTime.match(/^\d{2}:\d{2}/)) {
-                        // Already in HH:MM format
                         formattedTime = this.selectedTime.substring(0, 5);
                     }
                 }
@@ -1097,9 +950,8 @@
             // Get price from stored service data
             let price = '';
             if (this.serviceId && this.services.length > 0) {
-                const selectedService = this.services.find(service => service.id === this.serviceId);
+                const selectedService = this.services.find(service => service.id == this.serviceId);
                 if (selectedService && selectedService.price) {
-                    // Format price (add comma and dash if needed)
                     price = selectedService.price;
                     if (price && !price.includes(',')) {
                         price = price + ',-';
@@ -1117,6 +969,35 @@
         }
         
         /**
+         * Reset form to initial state
+         */
+        resetForm() {
+            // Reset all selections except serviceId and specialistId (they come from button)
+            this.locationId = '';
+            this.selectedDate = '';
+            this.selectedTime = '';
+            
+            // Reset UI selections
+            this.$form.find('.kab-service-item').removeClass('selected');
+            this.$form.find('.kab-category-item').removeClass('selected');
+            this.$form.find('.kab-specialist-card').removeClass('selected');
+            this.$form.find('.kab-day').removeClass('selected');
+            this.$form.find('.kab-time-slot').removeClass('selected');
+            
+            // Clear form fields
+            this.$form.find('#kab-first-name-stf').val('');
+            this.$form.find('#kab-email-stf').val('');
+            this.$form.find('#kab-phone-stf').val('');
+            this.$form.find('#kab-terms-stf').prop('checked', false);
+            
+            // Service is always pre-selected, so always start at step 1 (therapist)
+            if (this.serviceId) {
+                this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`).addClass('selected');
+            }
+            this.goToStep(1);
+        }
+        
+        /**
          * Submit booking
          */
         submitBooking() {
@@ -1127,13 +1008,11 @@
             const $error = $confirmationMessage.find('.kab-error');
             
             // Get form data
-            const firstName = this.$form.find('#kab-first-name').val();
-            const lastName = this.$form.find('#kab-last-name').val() || ''; // Last name is optional
-            const email = this.$form.find('#kab-email').val();
-            const phone = this.$form.find('#kab-phone').val();
-            const notes = this.$form.find('#kab-notes').val() || ''; // Notes are optional
+            const firstName = this.$form.find('#kab-first-name-stf').val();
+            const email = this.$form.find('#kab-email-stf').val();
+            const phone = this.$form.find('#kab-phone-stf').val();
             
-            // Validate form data (last name is optional)
+            // Validate form data
             if (!firstName || !email || !phone) {
                 $loading.hide();
                 $error.show();
@@ -1161,25 +1040,18 @@
                 grecaptcha.ready(function() {
                     grecaptcha.execute(kab_vars.recaptcha_site_key, {action: 'submit'}).then(function(token) {
                         recaptchaToken = token;
-                        self.processBooking(firstName, lastName, email, phone, notes, recaptchaToken);
+                        self.processBooking(firstName, email, phone, recaptchaToken);
                     });
                 });
             } else {
-                this.processBooking(firstName, lastName, email, phone, notes, recaptchaToken);
+                this.processBooking(firstName, email, phone, recaptchaToken);
             }
         }
         
         /**
          * Process booking
-         * 
-         * @param {string} firstName First name
-         * @param {string} lastName Last name
-         * @param {string} email Email
-         * @param {string} phone Phone
-         * @param {string} notes Notes
-         * @param {string} recaptchaToken reCAPTCHA token
          */
-        processBooking(firstName, lastName, email, phone, notes, recaptchaToken) {
+        processBooking(firstName, email, phone, recaptchaToken) {
             const self = this;
             const $confirmationMessage = this.$form.find('.kab-confirmation-message');
             const $loading = $confirmationMessage.find('.kab-loading');
@@ -1193,13 +1065,13 @@
                     action: 'kab_create_booking',
                     service_id: this.serviceId,
                     specialist_id: this.specialistId,
-                    location_id: this.locationId, // Include location_id
+                    location_id: this.locationId,
                     timeslot: this.selectedTime,
                     first_name: firstName,
-                    last_name: lastName,
+                    last_name: '',
                     email: email,
                     phone: phone,
-                    notes: notes,
+                    notes: '',
                     recaptcha_token: recaptchaToken,
                     nonce: kab_vars.nonce
                 },
@@ -1208,22 +1080,22 @@
                     
                     if (response.success) {
                         $success.show();
-                        $success.find('.kab-booking-message').html(response.data.message);
+                        $success.find('.kab-booking-message').html(response.data.message || 'Booking created successfully.');
                         
-                        // Build booking details
-                        let bookingDetails = `
-                            <div class="kab-booking-info-item">
-                                <span class="kab-booking-info-label">Booking ID:</span>
-                                <span class="kab-booking-info-value">${response.data.booking_id}</span>
-                            </div>
-                        `;
-                        
+                        // Build booking details for display
+                        let bookingDetails = '';
+                        if (response.data.booking_id) {
+                            bookingDetails += `
+                                <div class="kab-booking-info-item">
+                                    <span class="kab-booking-info-label">Booking ID:</span>
+                                    <span class="kab-booking-info-value">${response.data.booking_id}</span>
+                                </div>
+                            `;
+                        }
                         $success.find('.kab-booking-details').html(bookingDetails);
-                        
-                        // No redirect - stay on confirmation step
                     } else {
                         $error.show();
-                        $error.find('.kab-error-message').text(response.data.message);
+                        $error.find('.kab-error-message').text(response.data.message || kab_vars.error);
                     }
                 },
                 error: function() {
@@ -1233,16 +1105,34 @@
                 }
             });
         }
+        
+        /**
+         * Select a random specialist from the list
+         */
+        selectRandomSpecialist() {
+            // Check if we have specialists loaded
+            if (!this.specialists || this.specialists.length === 0) {
+                console.warn('No specialists available for random selection');
+                return;
+            }
+            
+            // Select a random specialist
+            const randomIndex = Math.floor(Math.random() * this.specialists.length);
+            const randomSpecialist = this.specialists[randomIndex];
+            
+            // Select the random specialist and auto-advance
+            this.selectSpecialist(randomSpecialist.id, true);
+        }
     }
     
     /**
-     * Initialize booking forms when DOM is ready
+     * Initialize service & therapist first booking forms when DOM is ready
      */
     $(document).ready(function() {
-        // Initialize booking forms (skip forms in hidden popups, therapist-first forms, and service-therapist-first forms - they'll be initialized when popup opens or by their own script)
-        $('.kab-booking-form').not('.kab-popup .kab-booking-form').not('.kab-therapist-first').not('.kab-service-therapist-first').each(function() {
+        // Initialize service & therapist first booking forms (skip forms in hidden popups - they'll be initialized when popup opens)
+        $('.kab-booking-form.kab-service-therapist-first').not('.kab-popup .kab-booking-form').each(function() {
             const $form = $(this);
-            const instance = new KABBookingForm($form);
+            const instance = new KABServiceTherapistFirstBookingForm($form);
             $form.data('kab-form-instance', instance);
         });
         
@@ -1265,14 +1155,8 @@
                 return; // Don't process therapist-first forms here
             }
             
-            // Skip if this is a service-therapist-first form (handled by public-service-therapist-first.js)
-            const $serviceTherapistForm = $popup.find('.kab-booking-form.kab-service-therapist-first');
-            if ($serviceTherapistForm.length) {
-                return; // Don't process service-therapist-first forms here
-            }
-            
-            // Handle regular booking form
-            const $form = $popup.find('.kab-booking-form');
+            // Handle service & therapist first booking form
+            const $form = $popup.find('.kab-booking-form.kab-service-therapist-first');
             if ($form.length) {
                 // Apply data attributes from button if present
                 if (serviceId) {
@@ -1285,7 +1169,7 @@
                 // Get or create form instance
                 let formInstance = $form.data('kab-form-instance');
                 if (!formInstance) {
-                    formInstance = new KABBookingForm($form);
+                    formInstance = new KABServiceTherapistFirstBookingForm($form);
                     $form.data('kab-form-instance', formInstance);
                 } else {
                     // Reset form state when reopening popup
@@ -1298,21 +1182,21 @@
                     if (currentSpecialistId) formInstance.specialistId = currentSpecialistId;
                 }
                 
-                // If serviceId provided, ensure it's selected and we move to step 2
+                // Service is always required and pre-selected
                 if (serviceId) {
                     formInstance.serviceId = serviceId;
                     // Update the data attribute
                     $form.attr('data-service-id', serviceId);
                     
-                    // If services are already loaded, select directly and go to step 2
+                    // If services are already loaded, select directly and go to step 1
                     if (formInstance.services && formInstance.services.length > 0) {
                         const serviceExists = formInstance.services.some(s => s.id === serviceId);
                         if (serviceExists) {
                             // Select service visually (without auto-advance)
                             formInstance.selectService(serviceId, false);
-                            // Go directly to step 2 without showing step 1
+                            // Go directly to step 1 (therapist) without showing step 0 (service)
                             setTimeout(() => {
-                                formInstance.goToStep(2);
+                                formInstance.goToStep(1);
                             }, 50);
                         } else {
                             formInstance.loadServices();
@@ -1322,9 +1206,9 @@
                         formInstance.loadServices();
                     }
                 } else {
-                    // No preselected service; reset to step 1
+                    // No service provided - this should not happen, but handle gracefully
+                    console.warn('No service ID provided for service-therapist-first form');
                     formInstance.goToStep(1);
-                    // If not initialized before, ensure services load
                     if (!formInstance.services || formInstance.services.length === 0) {
                         formInstance.loadServices();
                     }
@@ -1344,3 +1228,4 @@
     });
 
 })(jQuery);
+

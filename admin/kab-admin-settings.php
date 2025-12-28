@@ -176,27 +176,82 @@ function kab_display_dashboard_page() {
                     <p><?php _e('Use these shortcodes to add booking functionality to your pages:', 'konfidens-appointment-booking'); ?></p>
                     
                     <div class="kab-shortcode-example">
-                        <h4><?php _e('Basic Booking Form', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('1. Basic Booking Form', 'konfidens-appointment-booking'); ?></h4>
                         <code>[kab_appointment_form]</code>
-                        <p><?php _e('Displays the appointment booking form.', 'konfidens-appointment-booking'); ?></p>
+                        <p><?php _e('Displays the standard appointment booking form with all steps: Service → Location → Therapist → Date & Time → Personal Details.', 'konfidens-appointment-booking'); ?></p>
                     </div>
                     
                     <div class="kab-shortcode-example">
-                        <h4><?php _e('Popup Booking Button', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('2. Booking Form with Pre-selected Service', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[kab_appointment_form service_id="SERVICE_ID"]</code>
+                        <p><?php _e('Displays the booking form with a specific service pre-selected. Replace SERVICE_ID with the actual service ID.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('3. Therapist First Flow Form', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[kab_appointment_form flow="therapist-first" therapist_id="SPECIALIST_ID"]</code>
+                        <p><?php _e('Displays the booking form with therapist-first flow: Therapist → Service → Location → Date & Time → Personal Details. The therapist is pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('4. Service & Therapist First Flow Form', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[kab_appointment_form flow="service-therapist-first" service_id="SERVICE_ID" therapist_id="SPECIALIST_ID"]</code>
+                        <p><?php _e('Displays the booking form with service & therapist first flow: Service (pre-selected) → Therapist → Location → Date & Time → Personal Details. Both service and therapist can be pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('5. Popup Booking Button', 'konfidens-appointment-booking'); ?></h4>
                         <code>[su_button]Book Now[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form in a popup.', 'konfidens-appointment-booking'); ?></p>
+                        <p><?php _e('Creates a button that opens the standard booking form in a popup overlay.', 'konfidens-appointment-booking'); ?></p>
                     </div>
                     
                     <div class="kab-shortcode-example">
-                        <h4><?php _e('Pre-selected Service', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('6. Popup Button with Pre-selected Service', 'konfidens-appointment-booking'); ?></h4>
                         <code>[su_button service_id="SERVICE_ID"]Book This Service[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form with a specific service pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                        <p><?php _e('Creates a button that opens the booking form in a popup with a specific service pre-selected.', 'konfidens-appointment-booking'); ?></p>
                     </div>
                     
                     <div class="kab-shortcode-example">
-                        <h4><?php _e('Pre-selected Therapist', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('7. Popup Button with Pre-selected Therapist', 'konfidens-appointment-booking'); ?></h4>
                         <code>[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form with a specific therapist pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                        <p><?php _e('Creates a button that opens the booking form in a popup with a specific therapist pre-selected (uses therapist-first flow).', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('8. Popup Button with Service & Therapist First Flow', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[su_button flow="service-therapist-first" service_id="SERVICE_ID" id="SPECIALIST_ID"]Book Appointment[/su_button]</code>
+                        <p><?php _e('Creates a button that opens the booking form in a popup with service & therapist first flow. Both service and therapist are pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('9. Popup Button with Therapist First Flow', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[su_button flow="therapist-first" id="SPECIALIST_ID"]Book With Therapist[/su_button]</code>
+                        <p><?php _e('Creates a button that opens the booking form in a popup with therapist-first flow. The therapist is pre-selected.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('10. Custom Button Styling', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[su_button background="#007bff" class="custom-class"]Book Now[/su_button]</code>
+                        <p><?php _e('Creates a button with custom background color and CSS classes. You can combine this with any of the above parameters.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('Form Context Parameter', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[kab_appointment_form context="popup"]</code>
+                        <p><?php _e('Use context="popup" to display the form in a popup-style layout. Use context="sidebar" (default) for inline display.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><strong><?php _e('Parameters Reference:', 'konfidens-appointment-booking'); ?></strong></h4>
+                        <ul style="list-style: disc; margin-left: 20px; margin-top: 10px;">
+                            <li><strong>service_id</strong>: <?php _e('Pre-selects a service by its ID', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>therapist_id</strong>: <?php _e('Pre-selects a therapist by their ID (for kab_appointment_form)', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>id</strong>: <?php _e('Pre-selects a therapist by their ID (for su_button shortcode)', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>flow</strong>: <?php _e('Form flow type: "therapist-first" or "service-therapist-first"', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>context</strong>: <?php _e('Display context: "sidebar" (default) or "popup"', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>background</strong>: <?php _e('Button background color (hex code, e.g., "#007bff")', 'konfidens-appointment-booking'); ?></li>
+                            <li><strong>class</strong>: <?php _e('Additional CSS classes for the button', 'konfidens-appointment-booking'); ?></li>
+                        </ul>
                     </div>
                 </div>
             </div>

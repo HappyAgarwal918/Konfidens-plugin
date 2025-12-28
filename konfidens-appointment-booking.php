@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -103,6 +103,9 @@ function kab_enqueue_scripts() {
     
     // Enqueue therapist-first form script
     wp_enqueue_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
+    
+    // Enqueue service & therapist first form script
+    wp_enqueue_script('kab-js-service-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-service-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
     
     // Add reCAPTCHA if enabled
     if (get_option('kab_enable_recaptcha', false)) {
@@ -291,6 +294,8 @@ function kab_appointment_form_shortcode($atts) {
         array(
             'context' => 'sidebar', // sidebar or popup
             'therapist_id' => '', // For therapist-first flow
+            'service_id' => '', // For service & therapist first flow or regular flow
+            'flow' => '', // Form flow type: 'therapist-first', 'service-therapist-first', or default
         ),
         $atts,
         'kab_appointment_form'
@@ -299,11 +304,15 @@ function kab_appointment_form_shortcode($atts) {
     // Start output buffering
     ob_start();
     
-    // If therapist_id is provided, use therapist-first template
-    if (!empty($atts['therapist_id'])) {
+    // Determine which template to use based on flow type
+    if ($atts['flow'] === 'service-therapist-first') {
+        // Service & Therapist First flow - pass service_id and therapist_id
+        include KAB_PLUGIN_DIR . 'frontend/templates/form-template-service-therapist-first.php';
+    } elseif (!empty($atts['therapist_id'])) {
+        // Therapist First flow
         include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
     } else {
-        // Include regular form template
+        // Regular form template
         include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
     }
     
@@ -321,6 +330,7 @@ function kab_button_shortcode($atts, $content = null) {
             'class' => '',
             'service_id' => '',
             'id' => '', // specialist_id
+            'flow' => '', // Form flow type: 'therapist-first', 'service-therapist-first', or default
         ),
         $atts,
         'su_button'
@@ -371,14 +381,25 @@ function kab_button_shortcode($atts, $content = null) {
             <button class="kab-popup-close">&times;</button>
             <div class="kab-popup-inner">
                 <?php 
-                // If therapist_id (id attribute) is provided, use therapist-first template
-                if (!empty($atts['id'])) {
+                // Determine which template to use based on flow type
+                if ($atts['flow'] === 'service-therapist-first') {
+                    // Service & Therapist First flow
+                    $form_atts = array('context' => 'popup', 'flow' => 'service-therapist-first');
+                    if (!empty($atts['service_id'])) {
+                        $form_atts['service_id'] = $atts['service_id'];
+                    }
+                    if (!empty($atts['id'])) {
+                        $form_atts['therapist_id'] = $atts['id'];
+                    }
+                    $atts = $form_atts;
+                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template-service-therapist-first.php';
+                } elseif (!empty($atts['id'])) {
+                    // Therapist First flow
                     $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
-                    // Set $atts for the template
                     $atts = $therapist_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
                 } else {
-                    // Pass service_id and specialist_id to the form if provided
+                    // Regular form template
                     $form_atts = array('context' => 'popup');
                     if (!empty($atts['service_id'])) {
                         $form_atts['service_id'] = $atts['service_id'];
