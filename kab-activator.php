@@ -23,23 +23,6 @@ function kab_activate() {
 }
 
 /**
- * Check and update database tables if needed
- */
-function kab_check_db_updates() {
-    global $wpdb;
-    
-    // Check if price column exists in location_service table
-    $table_name = $wpdb->prefix . 'kab_location_service';
-    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'price'");
-    
-    if (empty($column_exists)) {
-        // Add price column
-        $wpdb->query("ALTER TABLE $table_name ADD COLUMN price varchar(50) DEFAULT ''");
-    }
-}
-add_action('plugins_loaded', 'kab_check_db_updates');
-
-/**
  * Set default options
  */
 function kab_set_default_options() {

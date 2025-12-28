@@ -230,7 +230,6 @@ function kab_display_therapists_page() {
                         } else {
                             var errorMsg = response.data && response.data.message ? response.data.message : '<?php _e("Error saving tags", "konfidens-appointment-booking"); ?>';
                             saveStatus.text(errorMsg).css('color', 'red');
-                            console.error('Error saving tags:', response);
                         }
                     },
                     error: function(xhr, status, error) {
@@ -239,7 +238,6 @@ function kab_display_therapists_page() {
                             errorMsg = xhr.responseJSON.data.message;
                         }
                         saveStatus.text(errorMsg).css('color', 'red');
-                        console.error('AJAX error:', status, error, xhr);
                     }
                 });
             }, 1000); // Wait 1 second after user stops typing

@@ -31,8 +31,7 @@ function kab_create_tables() {
         id int(11) NOT NULL AUTO_INCREMENT,
         service_id varchar(50) NOT NULL,
         location_ids text NOT NULL,
-        priority int(11) DEFAULT 0,
-        price varchar(50) DEFAULT '',
+        priority int(11) DEFAULT NULL,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
@@ -176,48 +175,109 @@ function kab_get_service_priority($service_id) {
     
     $service_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
     
-    if ($service_location && $service_location->priority !== null) {
-        // Return the actual priority value, even if it's 0
-        return $service_location->priority;
+    if ($service_location && $service_location->priority !== null && $service_location->priority !== '') {
+        return intval($service_location->priority);
     }
     
-    // No priority set, return null
     return null;
 }
 
 /**
- * Get service price
+ * Get service price from API only
+ * Price is always fetched from Konfidens API, not stored in database
  */
 function kab_get_service_price($service_id) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'kab_location_service';
+    // Get price from API
+    $service = kab_get_service_by_id($service_id);
     
-    $service_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
+    // Helper function to extract price value (handles arrays and objects)
+    // Also converts from cents to main currency unit if needed
+    $extract_price = function($value) {
+        $raw_price = '';
+        
+        if (is_array($value)) {
+            // If it's an array, try to get the first numeric value or join them
+            foreach ($value as $item) {
+                if (is_numeric($item)) {
+                    $raw_price = (string) $item;
+                    break;
+                }
+            }
+            // If no numeric value found, return first item as string
+            if (empty($raw_price)) {
+                $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
+            }
+        } elseif (is_object($value)) {
+            // If it's an object, try to get a value property
+            if (isset($value->value)) {
+                $raw_price = (string) $value->value;
+            } elseif (isset($value->amount)) {
+                $raw_price = (string) $value->amount;
+            } elseif (isset($value->price)) {
+                $raw_price = (string) $value->price;
+            }
+        } else {
+            $raw_price = (string) $value;
+        }
+        
+        // Convert from cents to main currency if the price seems to be in cents
+        // If price is a number and >= 1000, assume it might be in cents
+        if (!empty($raw_price) && is_numeric($raw_price)) {
+            $numeric_price = floatval($raw_price);
+            // If price is >= 1000 and is a whole number, likely in cents
+            // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
+            if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
+                $numeric_price = $numeric_price / 100;
+                // Format to 2 decimal places, remove trailing zeros
+                $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
+                return (string) $numeric_price;
+            }
+        }
+        
+        return $raw_price;
+    };
     
-    if ($service_location && isset($service_location->price)) {
-        return $service_location->price;
+    // Check if API response has price field
+    if (!empty($service)) {
+        // Check common price field names (in order of likelihood)
+        $price_fields = array('price', 'Price', 'amount', 'Amount');
+        
+        foreach ($price_fields as $field) {
+            if (isset($service[$field])) {
+                $price = $extract_price($service[$field]);
+                if (!empty($price)) {
+                    return $price;
+                }
+            }
+        }
     }
     
+    // No price found in API response
     return '';
 }
 
 /**
  * Add or update service location
  */
-function kab_add_update_service_location($service_id, $location_ids, $priority) {
+function kab_add_update_service_location($service_id, $location_ids, $priority = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_service';
     
     $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
+    
+    // Handle priority - convert to integer if set, otherwise null
+    $priority_value = ($priority !== null && $priority !== '') ? intval($priority) : null;
     
     if ($existing) {
         return $wpdb->update(
             $table_name,
             array(
                 'location_ids' => sanitize_text_field($location_ids),
-                'priority' => intval($priority)
+                'priority' => $priority_value
             ),
-            array('service_id' => $service_id)
+            array('service_id' => $service_id),
+            array('%s', '%d'),
+            array('%s')
         );
     } else {
         $result = $wpdb->insert(
@@ -225,43 +285,15 @@ function kab_add_update_service_location($service_id, $location_ids, $priority) 
             array(
                 'service_id' => sanitize_text_field($service_id),
                 'location_ids' => sanitize_text_field($location_ids),
-                'priority' => intval($priority)
-            )
+                'priority' => $priority_value
+            ),
+            array('%s', '%s', '%d')
         );
         
         return $result ? $wpdb->insert_id : false;
     }
 }
 
-/**
- * Update service price
- */
-function kab_update_service_price($service_id, $price) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'kab_location_service';
-    
-    $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
-    
-    if ($existing) {
-        return $wpdb->update(
-            $table_name,
-            array('price' => sanitize_text_field($price)),
-            array('service_id' => $service_id)
-        );
-    } else {
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'service_id' => sanitize_text_field($service_id),
-                'location_ids' => '',
-                'priority' => 0,
-                'price' => sanitize_text_field($price)
-            )
-        );
-        
-        return $result ? $wpdb->insert_id : false;
-    }
-}
 
 /**
  * Get specialist locations
@@ -418,34 +450,27 @@ function kab_import_services($services) {
     
     $imported = 0;
     
-    // Create default location if none exists
-    $locations = kab_get_locations();
-    $default_location_id = 0;
-    
-    if (empty($locations)) {
-        $default_location_id = kab_add_location([
-            'location_name' => 'Default Location',
-            'location_address' => '',
-            'location_phone' => '',
-            'location_email' => ''
-        ]);
-    } else {
-        $default_location_id = $locations[0]->id;
-    }
-    
     // Import each service
     foreach ($services as $service) {
         if (empty($service['id']) || empty($service['name'])) {
             continue;
         }
         
-        // Set default priority
-        $priority = 10;
+        // Check if service already exists in database
+        $existing_locations = kab_get_service_locations($service['id']);
+        $existing_priority = kab_get_service_priority($service['id']);
         
-        // Add or update service-location mapping
-        $result = kab_add_update_service_location($service['id'], $default_location_id, $priority);
-        
-        if ($result !== false) {
+        // Only update if service doesn't exist yet
+        if (empty($existing_locations)) {
+            // Service doesn't exist - create entry with blank location and priority
+            $result = kab_add_update_service_location($service['id'], '', null);
+            
+            if ($result !== false) {
+                $imported++;
+            }
+        } else {
+            // Service already exists - preserve existing locations and priority
+            // Just count it as imported/updated
             $imported++;
         }
     }

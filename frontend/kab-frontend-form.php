@@ -322,9 +322,6 @@ function kab_get_available_dates() {
         'specialist_id' => $specialist_id
     ));
     
-    // Debug information
-    error_log('API Response for dates: ' . print_r($timeslots_response, true));
-    
     if ($timeslots_response['success'] && !empty($timeslots_response['data'])) {
         $timeslots = $timeslots_response['data'];
         $dates = array();
@@ -427,9 +424,6 @@ function kab_get_timeslots_ajax() {
         'service_id' => $service_id,
         'specialist_id' => $specialist_id
     ));
-    
-    // Debug information
-    error_log('API Response for timeslots: ' . print_r($timeslots_response, true));
     
     $html_response = '';
     
@@ -588,20 +582,11 @@ function kab_create_booking() {
         )
     );
     
-    // Log booking data for debugging
-    error_log('Booking Request Data: ' . print_r($booking_data, true));
-    
-    // The old plugin does NOT include clinic_id in the request body
-    // It's only in the API key header
     $booking_response = kab_api_request('bookings', $booking_data, 'POST');
     
-    // Log API response for debugging
-    error_log('Booking API Response: ' . print_r($booking_response, true));
     if (isset($booking_response['data']) && is_array($booking_response['data'])) {
-        error_log('Booking API Response Data: ' . print_r($booking_response['data'], true));
         // Check for validation errors
         if (isset($booking_response['data']['errors'])) {
-            error_log('Booking API Validation Errors: ' . print_r($booking_response['data']['errors'], true));
         }
     }
     
@@ -629,8 +614,6 @@ function kab_create_booking() {
         }
         
         if (empty($booking_id)) {
-            // Log the response for debugging
-            error_log('Booking API Response (no ID): ' . print_r($booking_response, true));
             wp_send_json_error(array('message' => __('Booking created but could not retrieve booking ID. Please contact support.', 'konfidens-appointment-booking')));
             return;
         }
@@ -716,9 +699,6 @@ function kab_create_booking() {
         if (isset($booking_response['code'])) {
             $error_message .= ' (HTTP ' . $booking_response['code'] . ')';
         }
-        
-        // Log error for debugging
-        error_log('Booking API Error: ' . print_r($booking_response, true));
         
         wp_send_json_error(array('message' => $error_message));
     }

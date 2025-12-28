@@ -33,7 +33,6 @@ function kab_add_admin_menu() {
         'kab_display_services_page'
     );
     
-    
     // Therapists submenu
     add_submenu_page(
         'konfidens',
@@ -543,116 +542,8 @@ function kab_display_settings_page() {
             
             <p class="submit">
                 <input type="submit" name="kab_save_settings" class="button button-primary" value="<?php _e('Save Settings', 'konfidens-appointment-booking'); ?>" />
-                <button type="button" id="kab_test_connection" class="button button-secondary">
-                    <?php _e('Test API Connection', 'konfidens-appointment-booking'); ?>
-                </button>
-                <a href="<?php echo admin_url('admin.php?page=konfidens-services'); ?>" class="button button-secondary">
-                    <?php _e('Fetch Services', 'konfidens-appointment-booking'); ?>
-                </a>
             </p>
         </form>
-        
-        <script>
-        jQuery(document).ready(function($) {
-            // Test connection button
-            $('#kab_test_connection').on('click', function() {
-                var base_url = $('#kab_base_url').val();
-                var api_key = $('#kab_api_key').val();
-                var clinic_id = $('#kab_clinic_id').val();
-                
-                if (!base_url || !api_key || !clinic_id) {
-                    alert('<?php _e("Please fill in all API credentials.", "konfidens-appointment-booking"); ?>');
-                    return;
-                }
-                
-                $(this).prop('disabled', true).text('<?php _e("Testing...", "konfidens-appointment-booking"); ?>');
-                
-                $.ajax({
-                    url: ajaxurl,
-                    type: 'POST',
-                    data: {
-                        action: 'kab_test_connection',
-                        nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>',
-                        base_url: base_url,
-                        api_key: api_key,
-                        clinic_id: clinic_id
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            alert(response.data.message);
-                        } else {
-                            alert(response.data.message);
-                        }
-                    },
-                    error: function() {
-                        alert('<?php _e("Connection test failed. Please try again.", "konfidens-appointment-booking"); ?>');
-                    },
-                    complete: function() {
-                        $('#kab_test_connection').prop('disabled', false).text('<?php _e("Test API Connection", "konfidens-appointment-booking"); ?>');
-                    }
-                });
-            });
-        });
-        </script>
     </div>
     <?php
 }
-
-/**
- * AJAX handler for testing API connection
- */
-function kab_test_connection() {
-    // Check nonce
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
-    }
-    
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
-    }
-    
-    // Get API credentials from POST
-    $base_url = isset($_POST['base_url']) ? sanitize_url($_POST['base_url']) : '';
-    $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
-    $clinic_id = isset($_POST['clinic_id']) ? sanitize_text_field($_POST['clinic_id']) : '';
-    
-    // Temporarily set options for the test
-    $old_base_url = get_option('kab_base_url', '');
-    $old_api_key = get_option('kab_api_key', '');
-    $old_clinic_id = get_option('kab_clinic_id', '');
-    
-    update_option('kab_base_url', $base_url);
-    update_option('kab_api_key', $api_key);
-    update_option('kab_clinic_id', $clinic_id);
-    
-    // Define constants for this test if they don't exist
-    if (!defined('BASE_URL')) {
-        define('BASE_URL', $base_url);
-    }
-    if (!defined('API_KEY')) {
-        define('API_KEY', $api_key);
-    }
-    if (!defined('CLINIC_ID')) {
-        define('CLINIC_ID', $clinic_id);
-    }
-    
-    // Test connection
-    $response = kab_api_request('services', array('clinic_id' => $clinic_id));
-    
-    // Restore old options
-    update_option('kab_base_url', $old_base_url);
-    update_option('kab_api_key', $old_api_key);
-    update_option('kab_clinic_id', $old_clinic_id);
-    
-    // Return response
-    if ($response['success']) {
-        wp_send_json_success(array('message' => __('Connection successful!', 'konfidens-appointment-booking')));
-    } else {
-        wp_send_json_error(array(
-            'message' => $response['message'],
-            'details' => 'API URL: ' . $base_url . ', Clinic ID: ' . $clinic_id
-        ));
-    }
-}
-add_action('wp_ajax_kab_test_connection', 'kab_test_connection');

@@ -37,7 +37,6 @@
          */
         init() {
             if (!this.therapistId) {
-                console.error('Therapist ID is required for therapist-first booking form');
                 return;
             }
             
@@ -194,17 +193,14 @@
                             self.therapist = therapist;
                             self.displayTherapistCard(therapist);
                         } else {
-                            console.warn('Therapist not found with ID:', self.therapistId);
                             // Show card with error message
                             const $card = self.$form.find('.kab-selected-therapist-card');
                             $card.find('.kab-therapist-name').text('Therapist not found');
                         }
                     } else {
-                        console.error('No therapists in response');
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error loading therapist:', error);
                     // Show card with error message
                     const $card = self.$form.find('.kab-selected-therapist-card');
                     if ($card.length) {
@@ -223,7 +219,6 @@
             const $card = this.$form.find('.kab-selected-therapist-card');
             
             if (!$card.length) {
-                console.error('Therapist card element not found');
                 return;
             }
             
@@ -753,7 +748,6 @@
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error fetching time slots:', error);
                     $timeSlots.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                     self.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', true);
                 }

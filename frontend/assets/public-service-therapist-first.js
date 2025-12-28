@@ -23,7 +23,7 @@
             // Service is always required and pre-selected
             this.serviceId = $form.data('service-id') || '';
             if (!this.serviceId) {
-                console.error('Service ID is required for service-therapist-first booking form');
+                return;
             }
             
             this.specialistId = $form.data('specialist-id') || '';
@@ -97,8 +97,6 @@
                 const date = $(this).data('date') || $(this).attr('data-date');
                 if (date) {
                     self.selectDate(date);
-                } else {
-                    console.error('No date found on clicked day element');
                 }
             });
             
@@ -794,7 +792,6 @@
          */
         selectDate(date) {
             if (!date) {
-                console.error('No date provided to selectDate');
                 return;
             }
             
@@ -805,8 +802,6 @@
             const $selectedDay = this.$form.find(`.kab-day[data-date="${date}"]`);
             if ($selectedDay.length) {
                 $selectedDay.addClass('selected');
-            } else {
-                console.warn('Date element not found for date:', date);
             }
             
             // Load time slots
@@ -822,19 +817,16 @@
             
             // Validate required data
             if (!this.serviceId) {
-                console.error('Service ID is required to load time slots');
                 $timeSlots.html('<div class="kab-no-data">Service is required.</div>');
                 return;
             }
             
             if (!this.specialistId) {
-                console.error('Specialist ID is required to load time slots');
                 $timeSlots.html('<div class="kab-no-data">Please select a therapist first.</div>');
                 return;
             }
             
             if (!date) {
-                console.error('Date is required to load time slots');
                 $timeSlots.html('<div class="kab-no-data">Please select a date.</div>');
                 return;
             }
@@ -861,7 +853,6 @@
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error fetching time slots:', error, xhr.responseText);
                     $timeSlots.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
@@ -1112,7 +1103,6 @@
         selectRandomSpecialist() {
             // Check if we have specialists loaded
             if (!this.specialists || this.specialists.length === 0) {
-                console.warn('No specialists available for random selection');
                 return;
             }
             
@@ -1206,8 +1196,6 @@
                         formInstance.loadServices();
                     }
                 } else {
-                    // No service provided - this should not happen, but handle gracefully
-                    console.warn('No service ID provided for service-therapist-first form');
                     formInstance.goToStep(1);
                     if (!formInstance.services || formInstance.services.length === 0) {
                         formInstance.loadServices();

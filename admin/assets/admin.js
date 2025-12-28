@@ -229,30 +229,6 @@
                 }
             });
             
-            // Test API connection
-            $('#kab_test_connection').click(function(e) {
-                e.preventDefault();
-                
-                var data = {
-                    'action': 'kab_test_connection',
-                    'base_url': $('#kab_base_url').val(),
-                    'api_key': $('#kab_api_key').val(),
-                    'clinic_id': $('#kab_clinic_id').val(),
-                    'nonce': kab_admin_vars.nonce
-                };
-                
-                $(this).prop('disabled', true).text(kab_admin_vars.loading);
-                
-                $.post(ajaxurl, data, function(response) {
-                    if (response.success) {
-                        alert('Connection successful! API is working correctly.');
-                    } else {
-                        alert('Connection failed. Error: ' + response.data.message);
-                    }
-                    
-                    $('#kab_test_connection').prop('disabled', false).text('Test API Connection');
-                });
-            });
         }
     });
 

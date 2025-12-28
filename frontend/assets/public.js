@@ -458,14 +458,11 @@
             
             // If there are no cards, return early
             if ($cards.length === 0) {
-                console.log('No specialist cards found');
                 return;
             }
             
             let currentIndex = 0;
             const totalSlides = $cards.length;
-            
-            console.log(`Initializing slider with ${totalSlides} specialists`);
             
             // Show only the first card initially
             $cards.hide().eq(currentIndex).show();
@@ -635,7 +632,6 @@
                 const month = parseInt($(this).data('month'));
                 const year = parseInt($(this).data('year'));
                 
-                console.log(`Navigating to month: ${month}, year: ${year}`);
                 
                 // Update calendar
                 $datePicker.html(self.createCalendar(month, year, availableDates));
@@ -894,7 +890,6 @@
         selectRandomSpecialist() {
             // Check if we have specialists loaded
             if (!this.specialists || this.specialists.length === 0) {
-                console.warn('No specialists available for random selection');
                 return;
             }
             
@@ -981,7 +976,6 @@
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error fetching time slots:', error);
                     $timeSlots.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                     self.$form.find('.kab-form-step[data-step="4"] .kab-next-btn').prop('disabled', true);
                 }

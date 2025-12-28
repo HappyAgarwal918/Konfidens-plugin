@@ -19,7 +19,6 @@ function kab_display_services_page() {
     if ($services_response['success'] && !empty($services_response['data'])) {
         $services = $services_response['data'];
         
-        
         // Auto-import services if requested
         if (isset($_GET['import']) && $_GET['import'] == '1') {
             $imported = kab_import_services($services);
@@ -85,7 +84,7 @@ function kab_display_services_page() {
                             <th><?php _e('Total Bookings', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Locations', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Priority', 'konfidens-appointment-booking'); ?></th>
-                            <th><?php _e('Service Price', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Service Price (from API)', 'konfidens-appointment-booking'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -100,7 +99,72 @@ function kab_display_services_page() {
                             // Get service priority and locations
                             $priority = kab_get_service_priority($service['id']);
                             $service_locations = kab_get_service_locations($service['id']);
-                            $price = kab_get_service_price($service['id']);
+                            // Get price from API only
+                            // Helper function to extract price (handles arrays and objects)
+                            // Converts from cents to main currency unit if needed
+                            $extract_price = function($value) {
+                                $raw_price = '';
+                                
+                                if (is_array($value)) {
+                                    // If it's an array, try to get the first numeric value
+                                    foreach ($value as $item) {
+                                        if (is_numeric($item)) {
+                                            $raw_price = (string) $item;
+                                            break;
+                                        }
+                                    }
+                                    // If no numeric value found, return first item as string
+                                    if (empty($raw_price)) {
+                                        $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
+                                    }
+                                } elseif (is_object($value)) {
+                                    // If it's an object, try to get a value property
+                                    if (isset($value->value)) {
+                                        $raw_price = (string) $value->value;
+                                    } elseif (isset($value->amount)) {
+                                        $raw_price = (string) $value->amount;
+                                    } elseif (isset($value->price)) {
+                                        $raw_price = (string) $value->price;
+                                    }
+                                } else {
+                                    $raw_price = (string) $value;
+                                }
+                                
+                                // Convert from cents to main currency if the price seems to be in cents
+                                // If price is a number and >= 1000, assume it might be in cents
+                                if (!empty($raw_price) && is_numeric($raw_price)) {
+                                    $numeric_price = floatval($raw_price);
+                                    // If price is >= 1000 and is a whole number, likely in cents
+                                    // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
+                                    if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
+                                        $numeric_price = $numeric_price / 100;
+                                        // Format to 2 decimal places, remove trailing zeros
+                                        $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
+                                        return (string) $numeric_price;
+                                    }
+                                }
+                                
+                                return $raw_price;
+                            };
+                            
+                            // Get price from API - check common field names
+                            $price = '';
+                            $price_fields = array('price', 'Price', 'amount', 'Amount');
+                            
+                            foreach ($price_fields as $field) {
+                                if (isset($service[$field])) {
+                                    $price = $extract_price($service[$field]);
+                                    if (!empty($price)) break;
+                                }
+                            }
+                            
+                            // If not found in service object, try the function
+                            if (empty($price)) {
+                                $price = kab_get_service_price($service['id']);
+                            }
+                            
+                            // Ensure price is always a string
+                            $price = (string) $price;
                             
                             // Get booking count
                             $service_id = $service['id'];
@@ -143,7 +207,8 @@ function kab_display_services_page() {
                                     <input type="number" min="0" name="priority" class="priority-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($priority !== null ? $priority : ''); ?>">
                                 </td>
                                 <td>
-                                    <input type="number" min="0" name="price" class="price-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($price); ?>">
+                                    <input type="text" name="price" class="price-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($price); ?>" readonly style="background-color: #f0f0f0; cursor: not-allowed;" title="<?php _e('Price is fetched from Konfidens API', 'konfidens-appointment-booking'); ?>">
+                                    <small style="display: block; color: #666; margin-top: 5px; font-style: italic;"><?php _e('Price from API', 'konfidens-appointment-booking'); ?></small>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -161,8 +226,6 @@ function kab_display_services_page() {
                     setTimeout(function() {
                         copiedText.style.display = 'none'; // Hide after 1.5 sec
                     }, 1500);
-                }).catch(function(err) {
-                    console.error("Failed to copy text: ", err);
                 });
             }
             
@@ -231,29 +294,8 @@ function kab_display_services_page() {
                     });
                 });
                 
-                // Price update
-                $('.price-select').on('change', function() {
-                    var serviceId = $(this).data('id');
-                    var price = $(this).val();
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'kab_update_service_price',
-                            service_id: serviceId,
-                            price: price,
-                            nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                alert('Price updated successfully!');
-                            } else {
-                                alert('Error updating price: ' + response.data.message);
-                            }
-                        }
-                    });
-                });
+                // Price field is read-only (fetched from API)
+                // No update handler needed
             });
             </script>
         <?php endif; ?>
@@ -295,8 +337,72 @@ function kab_get_services_with_priority() {
             // Only include services that have a priority set (not null or empty)
             if ($priority !== null && $priority !== '') {
                 $service['priority'] = $priority;
-                // Add price to service data
-                $service['price'] = kab_get_service_price($service['id']);
+                // Get price from API only (prices are fetched from Konfidens API, not stored in database)
+                // Helper function to safely extract price (handles arrays and objects)
+                // Also converts from cents to main currency unit if needed
+                $extract_price = function($value) {
+                    $raw_price = '';
+                    
+                    if (is_array($value)) {
+                        // If it's an array, try to get the first numeric value
+                        foreach ($value as $item) {
+                            if (is_numeric($item)) {
+                                $raw_price = (string) $item;
+                                break;
+                            }
+                        }
+                        // If no numeric value found, return first item as string
+                        if (empty($raw_price)) {
+                            $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
+                        }
+                    } elseif (is_object($value)) {
+                        // If it's an object, try to get a value property
+                        if (isset($value->value)) {
+                            $raw_price = (string) $value->value;
+                        } elseif (isset($value->amount)) {
+                            $raw_price = (string) $value->amount;
+                        } elseif (isset($value->price)) {
+                            $raw_price = (string) $value->price;
+                        }
+                    } else {
+                        $raw_price = (string) $value;
+                    }
+                    
+                    // Convert from cents to main currency if the price seems to be in cents
+                    // If price is a number and >= 1000, assume it might be in cents
+                    if (!empty($raw_price) && is_numeric($raw_price)) {
+                        $numeric_price = floatval($raw_price);
+                        // If price is >= 1000 and is a whole number, likely in cents
+                        // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
+                        if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
+                            $numeric_price = $numeric_price / 100;
+                            // Format to 2 decimal places, remove trailing zeros
+                            $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
+                            return (string) $numeric_price;
+                        }
+                    }
+                    
+                    return $raw_price;
+                };
+                
+                // Get price from API - check common field names
+                $price_fields = array('price', 'Price', 'amount', 'Amount');
+                $service['price'] = '';
+                
+                foreach ($price_fields as $field) {
+                    if (isset($service[$field])) {
+                        $service['price'] = $extract_price($service[$field]);
+                        if (!empty($service['price'])) break;
+                    }
+                }
+                
+                // If not found in service object, try the function
+                if (empty($service['price'])) {
+                    $service['price'] = kab_get_service_price($service['id']);
+                }
+                
+                // Ensure price is always a string
+                $service['price'] = (string) $service['price'];
                 $prioritized_services[] = $service;
             }
         }
@@ -327,13 +433,20 @@ function kab_update_service_priority() {
     }
     
     // Check required fields
-    if (!isset($_POST['service_id']) || !isset($_POST['priority'])) {
+    if (!isset($_POST['service_id'])) {
         wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
-    $priority = intval($_POST['priority']);
-    $location_ids = isset($_POST['location_ids']) ? sanitize_text_field($_POST['location_ids']) : '';
+    $priority_input = isset($_POST['priority']) ? $_POST['priority'] : '';
+    // Convert to integer if set, otherwise null (allow clearing priority)
+    $priority = ($priority_input !== '' && $priority_input !== null && $priority_input !== '0') ? intval($priority_input) : null;
+    
+    // Get existing locations to preserve them
+    $existing_locations = kab_get_service_locations($service_id);
+    $location_ids = isset($_POST['location_ids']) && $_POST['location_ids'] !== '' 
+        ? sanitize_text_field($_POST['location_ids']) 
+        : (!empty($existing_locations) ? implode(',', $existing_locations) : '');
     
     // Update service priority
     $result = kab_add_update_service_location($service_id, $location_ids, $priority);
@@ -345,39 +458,6 @@ function kab_update_service_priority() {
     }
 }
 add_action('wp_ajax_kab_update_service_priority', 'kab_update_service_priority');
-
-/**
- * AJAX handler for updating service price
- */
-function kab_update_service_price_ajax() {
-    // Check nonce
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
-    }
-    
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
-    }
-    
-    // Check required fields
-    if (!isset($_POST['service_id']) || !isset($_POST['price'])) {
-        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
-    }
-    
-    $service_id = sanitize_text_field($_POST['service_id']);
-    $price = sanitize_text_field($_POST['price']);
-    
-    // Update service price
-    $result = kab_update_service_price($service_id, $price);
-    
-    if ($result !== false) {
-        wp_send_json_success(array('message' => __('Service price updated successfully.', 'konfidens-appointment-booking')));
-    } else {
-        wp_send_json_error(array('message' => __('Failed to update service price.', 'konfidens-appointment-booking')));
-    }
-}
-add_action('wp_ajax_kab_update_service_price', 'kab_update_service_price_ajax');
 
 /**
  * AJAX handler for updating service locations
