@@ -78,11 +78,69 @@
     color: #1D1C1F;
 }
 
-/* Service Selection */
+/* Service Selection - Default grid layout for direct services */
 .kab-services-list {
     display: grid;
     grid-template-columns: repeat(2, minmax(250px, 1fr));
     gap: 15px;
+}
+
+/* Category Group - Relative positioning for absolute dropdown */
+.kab-category-group {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Category Header */
+.kab-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #e8e5f4;
+    border-radius: 8px;
+    user-select: none;
+    position: relative;
+    z-index: 2;
+}
+
+.kab-category-header:hover {
+    background-color: #d9d6e5;
+}
+
+.kab-category-name {
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: -0.3px;
+    color: #452DAF;
+    margin: 0;
+}
+
+.kab-category-toggle {
+    font-family: "Manrope", Sans-serif;
+    font-size: 24px;
+    font-weight: 300;
+    color: #452DAF;
+    line-height: 1;
+    transition: transform 0.3s ease;
+}
+
+/* Category Services Container - Absolute positioned dropdown overlay */
+.kab-category-services {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    gap: 5px;
+    margin-top: 5px;
+    z-index: 10;
+    background-color: #ffffff;
 }
 
 /* Step Section (for combined steps) */
@@ -104,6 +162,8 @@
     transition: all 0.3s ease;
     background-color: #e8e5f4;
     border-radius: 8px;
+    position: relative;
+    z-index: 1;
 }
 
 .kab-service-item:hover {
@@ -1018,6 +1078,10 @@
     
     .kab-services-list,
     .kab-categories-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .kab-category-services {
         grid-template-columns: 1fr;
     }
     

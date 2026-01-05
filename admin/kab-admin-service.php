@@ -34,6 +34,9 @@ function kab_display_services_page() {
     // Get locations (categories)
     $locations = kab_get_locations();
     
+    // Get service categories
+    $service_categories = kab_get_service_categories();
+    
     ?>
     <div class="wrap kab-admin kab-services-page">
         <h1><?php _e('Konfidens Services', 'konfidens-appointment-booking'); ?></h1>
@@ -56,7 +59,79 @@ function kab_display_services_page() {
             .striped>tbody>:nth-child(odd){
                 background-color: #e9ffff;
             }
+            .kab-category-management {
+                background: #fff;
+                border: 1px solid #ccd0d4;
+                box-shadow: 0 1px 1px rgba(0,0,0,.04);
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .kab-category-management h2 {
+                margin-top: 0;
+            }
+            .kab-category-list {
+                margin-top: 15px;
+            }
+            .kab-category-item {
+                display: flex;
+                align-items: center;
+                padding: 8px;
+                border-bottom: 1px solid #eee;
+            }
+            .kab-category-item:last-child {
+                border-bottom: none;
+            }
+            .kab-category-name {
+                flex: 1;
+                margin-right: 10px;
+            }
+            .kab-category-actions {
+                display: flex;
+                gap: 5px;
+            }
+            .kab-add-category-form {
+                margin-top: 15px;
+                padding-top: 15px;
+                border-top: 1px solid #eee;
+            }
+            .kab-add-category-form input[type="text"] {
+                width: 300px;
+                margin-right: 10px;
+            }
         </style>
+        
+        <!-- Category Management Section -->
+        <div class="kab-category-management">
+            <h2><?php _e('Service Categories', 'konfidens-appointment-booking'); ?></h2>
+            <p><?php _e('Manage service categories. Each service can be assigned to one category.', 'konfidens-appointment-booking'); ?></p>
+            
+            <div class="kab-category-list">
+                <?php if (!empty($service_categories)): ?>
+                    <?php foreach ($service_categories as $category): ?>
+                        <div class="kab-category-item" data-category-id="<?php echo esc_attr($category->id); ?>">
+                            <span class="kab-category-name"><?php echo esc_html($category->category_name); ?></span>
+                            <div class="kab-category-actions">
+                                <button type="button" class="button button-small kab-edit-category" data-id="<?php echo esc_attr($category->id); ?>" data-name="<?php echo esc_attr($category->category_name); ?>">
+                                    <?php _e('Edit', 'konfidens-appointment-booking'); ?>
+                                </button>
+                                <button type="button" class="button button-small kab-delete-category" data-id="<?php echo esc_attr($category->id); ?>">
+                                    <?php _e('Delete', 'konfidens-appointment-booking'); ?>
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <p><?php _e('No categories defined yet.', 'konfidens-appointment-booking'); ?></p>
+                <?php endif; ?>
+            </div>
+            
+            <div class="kab-add-category-form">
+                <input type="text" id="kab-new-category-name" placeholder="<?php esc_attr_e('Category name', 'konfidens-appointment-booking'); ?>" />
+                <button type="button" class="button button-primary" id="kab-add-category">
+                    <?php _e('Add Category', 'konfidens-appointment-booking'); ?>
+                </button>
+            </div>
+        </div>
         
         <?php if (empty($services)): ?>
             <div class="notice notice-warning">
@@ -83,6 +158,7 @@ function kab_display_services_page() {
                             <th><?php _e('Service Name', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Total Bookings', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Locations', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Category', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Priority', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Service Price (from API)', 'konfidens-appointment-booking'); ?></th>
                         </tr>
@@ -96,9 +172,10 @@ function kab_display_services_page() {
                         $booking_counts = $wpdb->get_results("SELECT service_ids, COUNT(*) as total FROM $table_name_count GROUP BY service_ids", OBJECT_K);
                         
                         foreach ($services as $service): 
-                            // Get service priority and locations
+                            // Get service priority, locations, and category
                             $priority = kab_get_service_priority($service['id']);
                             $service_locations = kab_get_service_locations($service['id']);
+                            $service_category_id = kab_get_service_category_id($service['id']);
                             // Get price from API only
                             // Helper function to extract price (handles arrays and objects)
                             // Converts from cents to main currency unit if needed
@@ -204,6 +281,19 @@ function kab_display_services_page() {
                                     </div>
                                 </td>
                                 <td>
+                                    <select class="service-category-select" data-service-id="<?php echo esc_attr($service['id']); ?>" style="min-width: 150px;">
+                                        <option value=""><?php _e('-- No Category --', 'konfidens-appointment-booking'); ?></option>
+                                        <?php foreach ($service_categories as $category): ?>
+                                            <option value="<?php echo esc_attr($category->id); ?>" <?php selected($service_category_id, $category->id); ?>>
+                                                <?php echo esc_html($category->category_name); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <div class="save-status" id="category-save-status-<?php echo esc_attr($service['id']); ?>" style="display: none; margin-top: 5px; color: green; font-style: italic;">
+                                        <?php _e('Saved!', 'konfidens-appointment-booking'); ?>
+                                    </div>
+                                </td>
+                                <td>
                                     <input type="number" min="0" name="priority" class="priority-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($priority !== null ? $priority : ''); ?>">
                                 </td>
                                 <td>
@@ -296,6 +386,128 @@ function kab_display_services_page() {
                 
                 // Price field is read-only (fetched from API)
                 // No update handler needed
+                
+                // Category assignment
+                $('.service-category-select').on('change', function() {
+                    var serviceId = $(this).data('service-id');
+                    var categoryId = $(this).val();
+                    var saveStatus = $('#category-save-status-' + serviceId);
+                    
+                    saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'kab_update_service_category',
+                            service_id: serviceId,
+                            category_id: categoryId,
+                            nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                saveStatus.text('<?php _e("Saved!", "konfidens-appointment-booking"); ?>').css('color', 'green');
+                                setTimeout(function() {
+                                    saveStatus.fadeOut(500);
+                                }, 1500);
+                            } else {
+                                saveStatus.text('<?php _e("Error saving", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                            }
+                        },
+                        error: function() {
+                            saveStatus.text('<?php _e("Error saving", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                        }
+                    });
+                });
+                
+                // Add category
+                $('#kab-add-category').on('click', function() {
+                    var categoryName = $('#kab-new-category-name').val().trim();
+                    
+                    if (!categoryName) {
+                        alert('<?php _e("Please enter a category name", "konfidens-appointment-booking"); ?>');
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'kab_add_service_category',
+                            category_name: categoryName,
+                            nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                location.reload();
+                            } else {
+                                alert('<?php _e("Error adding category: ", "konfidens-appointment-booking"); ?>' + (response.data ? response.data.message : ''));
+                            }
+                        },
+                        error: function() {
+                            alert('<?php _e("Error adding category", "konfidens-appointment-booking"); ?>');
+                        }
+                    });
+                });
+                
+                // Edit category
+                $('.kab-edit-category').on('click', function() {
+                    var categoryId = $(this).data('id');
+                    var currentName = $(this).data('name');
+                    var newName = prompt('<?php _e("Enter new category name:", "konfidens-appointment-booking"); ?>', currentName);
+                    
+                    if (newName !== null && newName.trim() !== '') {
+                        $.ajax({
+                            url: ajaxurl,
+                            type: 'POST',
+                            data: {
+                                action: 'kab_update_service_category_name',
+                                category_id: categoryId,
+                                category_name: newName.trim(),
+                                nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                            },
+                            success: function(response) {
+                                if (response.success) {
+                                    location.reload();
+                                } else {
+                                    alert('<?php _e("Error updating category: ", "konfidens-appointment-booking"); ?>' + (response.data ? response.data.message : ''));
+                                }
+                            },
+                            error: function() {
+                                alert('<?php _e("Error updating category", "konfidens-appointment-booking"); ?>');
+                            }
+                        });
+                    }
+                });
+                
+                // Delete category
+                $('.kab-delete-category').on('click', function() {
+                    var categoryId = $(this).data('id');
+                    
+                    if (!confirm('<?php _e("Are you sure you want to delete this category? Services assigned to this category will have their category removed.", "konfidens-appointment-booking"); ?>')) {
+                        return;
+                    }
+                    
+                    $.ajax({
+                        url: ajaxurl,
+                        type: 'POST',
+                        data: {
+                            action: 'kab_delete_service_category',
+                            category_id: categoryId,
+                            nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                location.reload();
+                            } else {
+                                alert('<?php _e("Error deleting category: ", "konfidens-appointment-booking"); ?>' + (response.data ? response.data.message : ''));
+                            }
+                        },
+                        error: function() {
+                            alert('<?php _e("Error deleting category", "konfidens-appointment-booking"); ?>');
+                        }
+                    });
+                });
             });
             </script>
         <?php endif; ?>
@@ -404,6 +616,23 @@ function kab_get_services_with_priority() {
                 
                 // Ensure price is always a string
                 $service['price'] = (string) $service['price'];
+                
+                // Get category information
+                $category_id = kab_get_service_category_id($service['id']);
+                if ($category_id !== null) {
+                    $category = kab_get_service_category_by_id($category_id);
+                    if ($category) {
+                        $service['category_id'] = $category_id;
+                        $service['category_name'] = $category->category_name;
+                    } else {
+                        $service['category_id'] = null;
+                        $service['category_name'] = null;
+                    }
+                } else {
+                    $service['category_id'] = null;
+                    $service['category_name'] = null;
+                }
+                
                 $prioritized_services[] = $service;
             }
         }
@@ -444,24 +673,25 @@ function kab_update_service_priority() {
     // Allow 0 as a valid priority value
     $priority = ($priority_input !== '' && $priority_input !== null) ? intval($priority_input) : null;
     
-    // Get existing locations to preserve them
+    // Get existing locations and category to preserve them
     $existing_locations = kab_get_service_locations($service_id);
     $location_ids = isset($_POST['location_ids']) && $_POST['location_ids'] !== '' 
         ? sanitize_text_field($_POST['location_ids']) 
         : (!empty($existing_locations) ? implode(',', $existing_locations) : '');
+    $category_id = kab_get_service_category_id($service_id);
     
     // Ensure service entry exists (create if it doesn't)
     $existing_locations_check = kab_get_service_locations($service_id);
     if (empty($existing_locations_check) && $location_ids === '') {
         // Service entry doesn't exist, create it first with empty location_ids
-        kab_add_update_service_location($service_id, '', null);
+        kab_add_update_service_location($service_id, '', null, $category_id);
         // Re-fetch locations after creation
         $existing_locations = kab_get_service_locations($service_id);
         $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
     }
     
     // Update service priority
-    $result = kab_add_update_service_location($service_id, $location_ids, $priority);
+    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service priority updated successfully.', 'konfidens-appointment-booking')));
@@ -493,11 +723,12 @@ function kab_update_service_locations() {
     $service_id = sanitize_text_field($_POST['service_id']);
     $location_ids = sanitize_text_field($_POST['location_ids']);
     
-    // Get current priority
+    // Get current priority and category
     $priority = kab_get_service_priority($service_id);
+    $category_id = kab_get_service_category_id($service_id);
     
     // Update service locations
-    $result = kab_add_update_service_location($service_id, $location_ids, $priority);
+    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service locations updated successfully.', 'konfidens-appointment-booking')));
@@ -506,3 +737,150 @@ function kab_update_service_locations() {
     }
 }
 add_action('wp_ajax_kab_update_service_locations', 'kab_update_service_locations');
+
+/**
+ * AJAX handler for updating service category
+ */
+function kab_update_service_category_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['service_id'])) {
+        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
+    }
+    
+    $service_id = sanitize_text_field($_POST['service_id']);
+    $category_id_input = isset($_POST['category_id']) ? $_POST['category_id'] : '';
+    // Convert to integer if set, otherwise null (allow clearing category)
+    $category_id = ($category_id_input !== '' && $category_id_input !== null) ? intval($category_id_input) : null;
+    
+    // Get existing locations and priority to preserve them
+    $existing_locations = kab_get_service_locations($service_id);
+    $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
+    $priority = kab_get_service_priority($service_id);
+    
+    // Ensure service entry exists (create if it doesn't)
+    $existing_locations_check = kab_get_service_locations($service_id);
+    if (empty($existing_locations_check) && $location_ids === '') {
+        // Service entry doesn't exist, create it first with empty location_ids
+        kab_add_update_service_location($service_id, '', null, $category_id);
+        // Re-fetch locations after creation
+        $existing_locations = kab_get_service_locations($service_id);
+        $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
+    }
+    
+    // Update service category
+    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
+    
+    if ($result !== false) {
+        wp_send_json_success(array('message' => __('Service category updated successfully.', 'konfidens-appointment-booking')));
+    } else {
+        wp_send_json_error(array('message' => __('Failed to update service category.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_update_service_category', 'kab_update_service_category_ajax');
+
+/**
+ * AJAX handler for adding service category
+ */
+function kab_add_service_category_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['category_name']) || empty(trim($_POST['category_name']))) {
+        wp_send_json_error(array('message' => __('Category name is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $category_name = sanitize_text_field($_POST['category_name']);
+    
+    // Add category
+    $result = kab_add_service_category($category_name);
+    
+    if ($result !== false) {
+        wp_send_json_success(array('message' => __('Category added successfully.', 'konfidens-appointment-booking'), 'category_id' => $result));
+    } else {
+        wp_send_json_error(array('message' => __('Failed to add category.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_add_service_category', 'kab_add_service_category_ajax');
+
+/**
+ * AJAX handler for updating service category name
+ */
+function kab_update_service_category_name_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['category_id']) || !isset($_POST['category_name']) || empty(trim($_POST['category_name']))) {
+        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
+    }
+    
+    $category_id = intval($_POST['category_id']);
+    $category_name = sanitize_text_field($_POST['category_name']);
+    
+    // Update category
+    $result = kab_update_service_category($category_id, $category_name);
+    
+    if ($result !== false) {
+        wp_send_json_success(array('message' => __('Category updated successfully.', 'konfidens-appointment-booking')));
+    } else {
+        wp_send_json_error(array('message' => __('Failed to update category.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_update_service_category_name', 'kab_update_service_category_name_ajax');
+
+/**
+ * AJAX handler for deleting service category
+ */
+function kab_delete_service_category_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check permissions
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['category_id'])) {
+        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
+    }
+    
+    $category_id = intval($_POST['category_id']);
+    
+    // Delete category (this will also remove category assignments from services)
+    $result = kab_delete_service_category($category_id);
+    
+    if ($result !== false) {
+        wp_send_json_success(array('message' => __('Category deleted successfully.', 'konfidens-appointment-booking')));
+    } else {
+        wp_send_json_error(array('message' => __('Failed to delete category.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_delete_service_category', 'kab_delete_service_category_ajax');

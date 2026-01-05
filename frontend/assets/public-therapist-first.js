@@ -279,16 +279,95 @@
                         // Store services data for later use (including prices)
                         self.services = response.data.services;
                         
-                        // Build HTML more efficiently using array map and join
-                        const html = response.data.services.map(service => 
-                            `<div class="kab-service-item" data-service-id="${service.id}">
-                                <div class="kab-service-info">
-                                    <p>${service.name}</p>
-                                </div>
-                            </div>`
-                        ).join('');
+                        // Group services by category
+                        const categories = response.data.categories || [];
+                        const servicesByCategory = {};
+                        const uncategorizedServices = [];
+                        
+                        // Initialize categories
+                        categories.forEach(cat => {
+                            servicesByCategory[cat.id] = {
+                                category: cat,
+                                services: []
+                            };
+                        });
+                        
+                        // Group services
+                        self.services.forEach(service => {
+                            if (service.category_id && servicesByCategory[service.category_id]) {
+                                servicesByCategory[service.category_id].services.push(service);
+                            } else {
+                                uncategorizedServices.push(service);
+                            }
+                        });
+                        
+                        // Build HTML with category dropdowns
+                        let html = '';
+                        
+                        // Check if we have any categorized services
+                        const hasCategorizedServices = Object.values(servicesByCategory).some(catData => catData.services.length > 0);
+                        
+                        if (hasCategorizedServices) {
+                            // Render categorized services directly in the grid (no wrapper div)
+                            Object.values(servicesByCategory).forEach(catData => {
+                                if (catData.services.length > 0) {
+                                    html += `<div class="kab-category-group">
+                                        <div class="kab-category-header" data-category-id="${catData.category.id}">
+                                            <span class="kab-category-name">${catData.category.category_name}</span>
+                                            <span class="kab-category-toggle">+</span>
+                                        </div>
+                                        <div class="kab-category-services" style="display: none;">
+                                            ${catData.services.map(service => 
+                                                `<div class="kab-service-item" data-service-id="${service.id}">
+                                                    <div class="kab-service-info">
+                                                        <p>${service.name}</p>
+                                                    </div>
+                                                </div>`
+                                            ).join('')}
+                                        </div>
+                                    </div>`;
+                                }
+                            });
+                            
+                            // Add uncategorized services directly (without category grouping)
+                            if (uncategorizedServices.length > 0) {
+                                html += uncategorizedServices.map(service => 
+                                    `<div class="kab-service-item" data-service-id="${service.id}">
+                                        <div class="kab-service-info">
+                                            <p>${service.name}</p>
+                                        </div>
+                                    </div>`
+                                ).join('');
+                            }
+                        } else {
+                            // No categories, render all services directly like before
+                            html = self.services.map(service => 
+                                `<div class="kab-service-item" data-service-id="${service.id}">
+                                    <div class="kab-service-info">
+                                        <p>${service.name}</p>
+                                    </div>
+                                </div>`
+                            ).join('');
+                        }
                         
                         $servicesList.html(html);
+                        
+                        // Initialize category toggle functionality (only if categories exist)
+                        if (hasCategorizedServices) {
+                            $servicesList.find('.kab-category-header').on('click', function() {
+                                const $header = $(this);
+                                const $services = $header.next('.kab-category-services');
+                                const $toggle = $header.find('.kab-category-toggle');
+                                
+                                // Close all other categories
+                                $servicesList.find('.kab-category-services').not($services).slideUp(200);
+                                $servicesList.find('.kab-category-toggle').not($toggle).text('+');
+                                
+                                // Toggle current category
+                                $services.slideToggle(200);
+                                $toggle.text($services.is(':visible') ? '−' : '+');
+                            });
+                        }
                     } else {
                         $servicesList.html('<div class="kab-no-data">' + (response.data?.message || kab_vars.no_services) + '</div>');
                     }

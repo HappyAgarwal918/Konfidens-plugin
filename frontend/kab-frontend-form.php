@@ -20,8 +20,14 @@ function kab_get_services() {
     // Get services with priority
     $services = kab_get_services_with_priority();
     
+    // Get all categories for grouping
+    $categories = kab_get_service_categories();
+    
     if (!empty($services)) {
-        wp_send_json_success(array('services' => $services));
+        wp_send_json_success(array(
+            'services' => $services,
+            'categories' => $categories
+        ));
     } else {
         wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
     }
@@ -232,8 +238,14 @@ function kab_get_services_for_therapist_ajax() {
         }
     }
     
+    // Get all categories for grouping
+    $categories = kab_get_service_categories();
+    
     if (!empty($therapist_services)) {
-        wp_send_json_success(array('services' => $therapist_services));
+        wp_send_json_success(array(
+            'services' => $therapist_services,
+            'categories' => $categories
+        ));
     } else {
         wp_send_json_error(array('message' => __('No services available for this therapist.', 'konfidens-appointment-booking')));
     }

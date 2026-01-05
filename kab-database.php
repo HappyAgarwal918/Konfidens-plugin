@@ -25,6 +25,16 @@ function kab_create_tables() {
         PRIMARY KEY (id)
     ) $charset_collate;");
     
+    // Create service category table
+    $category_table = $wpdb->prefix . 'kab_service_category';
+    $wpdb->query("CREATE TABLE IF NOT EXISTS $category_table (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        category_name varchar(255) NOT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+    ) $charset_collate;");
+    
     // Create location service table
     $location_service_table = $wpdb->prefix . 'kab_location_service';
     $wpdb->query("CREATE TABLE IF NOT EXISTS $location_service_table (
@@ -32,10 +42,17 @@ function kab_create_tables() {
         service_id varchar(50) NOT NULL,
         location_ids text NOT NULL,
         priority int(11) DEFAULT NULL,
+        category_id int(11) DEFAULT NULL,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
     ) $charset_collate;");
+    
+    // Add category_id column if it doesn't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_service_table LIKE 'category_id'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $location_service_table ADD COLUMN category_id int(11) DEFAULT NULL AFTER priority");
+    }
     
     // Create setting table
     $setting_table = $wpdb->prefix . 'kab_setting';
@@ -183,6 +200,89 @@ function kab_get_service_priority($service_id) {
 }
 
 /**
+ * Get service category ID
+ */
+function kab_get_service_category_id($service_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_service';
+    
+    $service_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
+    
+    if ($service_location && $service_location->category_id !== null && $service_location->category_id !== '') {
+        return intval($service_location->category_id);
+    }
+    
+    return null;
+}
+
+/**
+ * Get all service categories
+ */
+function kab_get_service_categories() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_category';
+    
+    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY category_name ASC");
+}
+
+/**
+ * Get service category by ID
+ */
+function kab_get_service_category_by_id($id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_category';
+    
+    return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $id));
+}
+
+/**
+ * Add a new service category
+ */
+function kab_add_service_category($category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_category';
+    
+    $result = $wpdb->insert(
+        $table_name,
+        array('category_name' => sanitize_text_field($category_name))
+    );
+    
+    return $result ? $wpdb->insert_id : false;
+}
+
+/**
+ * Update a service category
+ */
+function kab_update_service_category($id, $category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_category';
+    
+    return $wpdb->update(
+        $table_name,
+        array('category_name' => sanitize_text_field($category_name)),
+        array('id' => $id)
+    );
+}
+
+/**
+ * Delete a service category
+ */
+function kab_delete_service_category($id) {
+    global $wpdb;
+    $category_table = $wpdb->prefix . 'kab_service_category';
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
+    
+    // First, remove category assignment from all services
+    $wpdb->query($wpdb->prepare(
+        "UPDATE $location_service_table SET category_id = NULL WHERE category_id = %d",
+        $id
+    ));
+    
+    // Then delete the category
+    return $wpdb->delete($category_table, array('id' => $id));
+}
+
+/**
  * Get service price from API only
  * Price is always fetched from Konfidens API, not stored in database
  */
@@ -259,7 +359,7 @@ function kab_get_service_price($service_id) {
 /**
  * Add or update service location
  */
-function kab_add_update_service_location($service_id, $location_ids, $priority = null) {
+function kab_add_update_service_location($service_id, $location_ids, $priority = null, $category_id = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_service';
     
@@ -268,34 +368,70 @@ function kab_add_update_service_location($service_id, $location_ids, $priority =
     // Handle priority - convert to integer if set, otherwise null
     $priority_value = ($priority !== null && $priority !== '') ? intval($priority) : null;
     
+    // Handle category_id - convert to integer if set, otherwise null
+    $category_id_value = ($category_id !== null && $category_id !== '') ? intval($category_id) : null;
+    
     if ($existing) {
         // For update, we need to handle NULL properly
-        if ($priority_value === null) {
+        if ($priority_value === null && $category_id_value === null) {
             // Use raw SQL to set NULL
             $result = $wpdb->query($wpdb->prepare(
-                "UPDATE $table_name SET location_ids = %s, priority = NULL WHERE service_id = %s",
+                "UPDATE $table_name SET location_ids = %s, priority = NULL, category_id = NULL WHERE service_id = %s",
                 sanitize_text_field($location_ids),
+                $service_id
+            ));
+            return $result !== false;
+        } elseif ($priority_value === null) {
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, priority = NULL, category_id = %d WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $category_id_value,
+                $service_id
+            ));
+            return $result !== false;
+        } elseif ($category_id_value === null) {
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, priority = %d, category_id = NULL WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $priority_value,
                 $service_id
             ));
             return $result !== false;
         } else {
             // Use raw SQL to ensure proper update (wpdb->update can return 0 if no change, which is falsy)
             $result = $wpdb->query($wpdb->prepare(
-                "UPDATE $table_name SET location_ids = %s, priority = %d WHERE service_id = %s",
+                "UPDATE $table_name SET location_ids = %s, priority = %d, category_id = %d WHERE service_id = %s",
                 sanitize_text_field($location_ids),
                 $priority_value,
+                $category_id_value,
                 $service_id
             ));
             return $result !== false;
         }
     } else {
         // For insert, we need to handle NULL properly
-        if ($priority_value === null) {
+        if ($priority_value === null && $category_id_value === null) {
             // Use raw SQL to insert NULL
             $result = $wpdb->query($wpdb->prepare(
-                "INSERT INTO $table_name (service_id, location_ids, priority) VALUES (%s, %s, NULL)",
+                "INSERT INTO $table_name (service_id, location_ids, priority, category_id) VALUES (%s, %s, NULL, NULL)",
                 sanitize_text_field($service_id),
                 sanitize_text_field($location_ids)
+            ));
+            return $result ? $wpdb->insert_id : false;
+        } elseif ($priority_value === null) {
+            $result = $wpdb->query($wpdb->prepare(
+                "INSERT INTO $table_name (service_id, location_ids, priority, category_id) VALUES (%s, %s, NULL, %d)",
+                sanitize_text_field($service_id),
+                sanitize_text_field($location_ids),
+                $category_id_value
+            ));
+            return $result ? $wpdb->insert_id : false;
+        } elseif ($category_id_value === null) {
+            $result = $wpdb->query($wpdb->prepare(
+                "INSERT INTO $table_name (service_id, location_ids, priority, category_id) VALUES (%s, %s, %d, NULL)",
+                sanitize_text_field($service_id),
+                sanitize_text_field($location_ids),
+                $priority_value
             ));
             return $result ? $wpdb->insert_id : false;
         } else {
@@ -304,9 +440,10 @@ function kab_add_update_service_location($service_id, $location_ids, $priority =
                 array(
                     'service_id' => sanitize_text_field($service_id),
                     'location_ids' => sanitize_text_field($location_ids),
-                    'priority' => $priority_value
+                    'priority' => $priority_value,
+                    'category_id' => $category_id_value
                 ),
-                array('%s', '%s', '%d')
+                array('%s', '%s', '%d', '%d')
             );
             return $result ? $wpdb->insert_id : false;
         }
@@ -478,17 +615,18 @@ function kab_import_services($services) {
         // Check if service already exists in database
         $existing_locations = kab_get_service_locations($service['id']);
         $existing_priority = kab_get_service_priority($service['id']);
+        $existing_category_id = kab_get_service_category_id($service['id']);
         
         // Only update if service doesn't exist yet
         if (empty($existing_locations)) {
-            // Service doesn't exist - create entry with blank location and priority
-            $result = kab_add_update_service_location($service['id'], '', null);
+            // Service doesn't exist - create entry with blank location, priority, and category
+            $result = kab_add_update_service_location($service['id'], '', null, null);
             
             if ($result !== false) {
                 $imported++;
             }
         } else {
-            // Service already exists - preserve existing locations and priority
+            // Service already exists - preserve existing locations, priority, and category
             // Just count it as imported/updated
             $imported++;
         }
