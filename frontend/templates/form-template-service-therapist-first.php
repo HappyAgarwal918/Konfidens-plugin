@@ -47,7 +47,7 @@ $form_classes[] = 'kab-context-' . $context;
             </div>
         </div>
         
-        <!-- Step 1: Specialist Selection -->
+        <!-- Step 1: Specialist Selection (with service card) -->
         <div class="kab-form-step" data-step="1">
             <div>
                 <div class="kab-step-header">
@@ -60,7 +60,13 @@ $form_classes[] = 'kab-context-' . $context;
                 </div>
             </div>
             <div class="kab-form-navigation">
-                <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
+                <!-- Selected Service Card -->
+                <div class="kab-selected-service-card">
+                    <p><?php _e('Din tjeneste:', 'konfidens-appointment-booking'); ?></p>
+                    <div class="kab-service-card-content">
+                        <div class="kab-service-name"></div>
+                    </div>
+                </div>
                 <button class="kab-random-specialist-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowright.png'; ?>" alt="<?php _e('Next', 'konfidens-appointment-booking'); ?>"></button>
             </div>
         </div>

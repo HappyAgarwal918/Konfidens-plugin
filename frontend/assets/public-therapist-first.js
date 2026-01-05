@@ -20,6 +20,8 @@
             this.maxStep = 4;
             
             this.therapistId = $form.data('therapist-id') || '';
+            // Store original pre-selected therapist ID to distinguish from user-selected
+            this.preselectedTherapistId = $form.data('therapist-id') || '';
             this.serviceId = '';
             this.locationId = '';
             this.selectedDate = '';
@@ -40,7 +42,15 @@
                 return;
             }
             
+            // Hide all steps initially
+            this.$form.find('.kab-form-step').hide();
+            
+            // Show step 1 immediately (don't wait for data to load)
+            this.goToStep(1);
+            
             this.initEvents();
+            
+            // Load data in background
             this.loadTherapist();
             this.loadServices();
         }
@@ -195,9 +205,10 @@
                         } else {
                             // Show card with error message
                             const $card = self.$form.find('.kab-selected-therapist-card');
-                            $card.find('.kab-therapist-name').text('Therapist not found');
+                            if ($card.length) {
+                                $card.find('.kab-therapist-name').text('Therapist not found');
+                            }
                         }
-                    } else {
                     }
                 },
                 error: function(xhr, status, error) {
@@ -250,7 +261,10 @@
             const self = this;
             const $servicesList = this.$form.find('.kab-services-list');
             
-            $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            // Only show loading if list is empty
+            if ($servicesList.is(':empty') || $servicesList.find('.kab-service-item').length === 0) {
+                $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            }
             
             $.ajax({
                 url: kab_vars.ajax_url,
@@ -265,17 +279,14 @@
                         // Store services data for later use (including prices)
                         self.services = response.data.services;
                         
-                        let html = '';
-                        
-                        $.each(response.data.services, function(index, service) {
-                            html += `
-                                <div class="kab-service-item" data-service-id="${service.id}">
-                                    <div class="kab-service-info">
-                                        <p>${service.name}</p>
-                                    </div>
+                        // Build HTML more efficiently using array map and join
+                        const html = response.data.services.map(service => 
+                            `<div class="kab-service-item" data-service-id="${service.id}">
+                                <div class="kab-service-info">
+                                    <p>${service.name}</p>
                                 </div>
-                            `;
-                        });
+                            </div>`
+                        ).join('');
                         
                         $servicesList.html(html);
                     } else {
@@ -645,7 +656,9 @@
         handleStepChange(step) {
             switch (step) {
                 case 0:
-                    // Therapist selection step - already loaded in loadAllTherapists
+                    // Therapist selection step - always reload all therapists when going to step 0
+                    // This ensures we show all therapists, not just the previously selected one
+                    this.loadAllTherapists();
                     break;
                 case 2:
                     this.loadCategories();
@@ -876,6 +889,14 @@
          */
         resetForm() {
             // Reset all selections
+            // Read therapistId from data attribute to ensure we use the correct one
+            // This ensures we use the original pre-selected therapist when reopening popup
+            const therapistIdData = this.$form.data('therapist-id') || '';
+            if (therapistIdData) {
+                this.therapistId = therapistIdData;
+            }
+            
+            this.serviceId = '';
             this.locationId = '';
             this.selectedDate = '';
             this.selectedTime = '';
@@ -901,9 +922,11 @@
             // Go back to step 1
             this.goToStep(1);
             
-            // Reload services for the selected therapist
+            // Reload services for the therapist (will use therapistId from data attribute)
             if (this.therapistId) {
                 this.loadServices();
+                // Also reload therapist info to show correct therapist card
+                this.loadTherapist();
             }
         }
         
@@ -1023,9 +1046,57 @@
      * Initialize therapist-first booking forms when DOM is ready
      */
     $(document).ready(function() {
-        // Initialize therapist-first booking forms
-        $('.kab-booking-form.kab-therapist-first').each(function() {
-            new KABTherapistFirstBookingForm($(this));
+        // Initialize therapist-first booking forms (skip forms in hidden popups - they'll be initialized when popup opens)
+        $('.kab-booking-form.kab-therapist-first').not('.kab-popup .kab-booking-form').each(function() {
+            const $form = $(this);
+            const instance = new KABTherapistFirstBookingForm($form);
+            $form.data('kab-form-instance', instance);
+        });
+        
+        // Initialize popup functionality for therapist-first forms
+        $('.kab-button[data-popup-target]').click(function() {
+            const $button = $(this);
+            const popupId = $button.data('popup-target');
+            const $popup = $('#' + popupId);
+            
+            // Get therapist_id from button
+            const therapistId = $button.data('specialist-id') || $button.data('id') || '';
+            
+            // Show popup
+            $popup.show();
+            
+            // Handle therapist-first booking form
+            const $form = $popup.find('.kab-booking-form.kab-therapist-first');
+            if ($form.length) {
+                // Apply data attributes from button if present
+                if (therapistId) {
+                    $form.attr('data-therapist-id', therapistId);
+                }
+                
+                // Get or create form instance
+                let formInstance = $form.data('kab-form-instance');
+                if (!formInstance) {
+                    formInstance = new KABTherapistFirstBookingForm($form);
+                    $form.data('kab-form-instance', formInstance);
+                } else {
+                    // Reset form state when reopening popup
+                    // Always reset to original pre-selected therapist from button
+                    formInstance.therapistId = therapistId || '';
+                    formInstance.preselectedTherapistId = therapistId || '';
+                    formInstance.serviceId = '';
+                    formInstance.locationId = '';
+                    formInstance.selectedDate = '';
+                    formInstance.selectedTime = '';
+                    
+                    // Update form's data attribute to match button
+                    if (therapistId) {
+                        $form.attr('data-therapist-id', therapistId);
+                    }
+                    
+                    // Reset form (will reload services for original therapist)
+                    formInstance.resetForm();
+                }
+            }
         });
     });
 

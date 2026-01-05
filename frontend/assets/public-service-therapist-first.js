@@ -33,6 +33,7 @@
             this.services = []; // Store services data with prices
             this.locations = []; // Store locations data
             this.specialists = []; // Store specialists data for random selection
+            this.isLoadingSpecialists = false; // Flag to prevent multiple simultaneous specialist loads
             
             this.init();
         }
@@ -44,14 +45,19 @@
             // Hide all steps initially
             this.$form.find('.kab-form-step').hide();
             
-            // Set current step to 0 initially (will go to 1 after services load)
-            this.currentStep = 0;
+            // Show step 1 immediately (don't wait for data to load)
+            this.goToStep(1);
             
             // Initialize events first
             this.initEvents();
             
-            // Load services (service is always pre-selected from shortcode)
-            // After services load, form will go to step 1 (therapist selection)
+            // Show service card container immediately (even before data loads)
+            const $serviceCard = this.$form.find('.kab-selected-service-card');
+            if ($serviceCard.length) {
+                $serviceCard.show();
+            }
+            
+            // Load services in background (service is always pre-selected from shortcode)
             this.loadServices();
         }
         
@@ -182,7 +188,10 @@
             const self = this;
             const $servicesList = this.$form.find('.kab-services-list');
             
-            $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            // Only show loading if list is empty
+            if ($servicesList.is(':empty') || $servicesList.find('.kab-service-item').length === 0) {
+                $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            }
             
             $.ajax({
                 url: kab_vars.ajax_url,
@@ -195,30 +204,33 @@
                     if (response.success && response.data.services) {
                         self.services = response.data.services;
                         
-                        let html = '';
-                        $.each(response.data.services, function(index, service) {
+                        // Build HTML more efficiently using array map and join
+                        const html = response.data.services.map(service => {
                             const isSelected = self.serviceId == service.id ? 'selected' : '';
-                            html += `
-                                <div class="kab-service-item ${isSelected}" data-service-id="${service.id}">
-                                    <div class="kab-service-info">
-                                        <p>${service.name}</p>
-                                    </div>
+                            return `<div class="kab-service-item ${isSelected}" data-service-id="${service.id}">
+                                <div class="kab-service-info">
+                                    <p>${service.name}</p>
                                 </div>
-                            `;
-                        });
+                            </div>`;
+                        }).join('');
                         
                         $servicesList.html(html);
                         
-                        // Service is always pre-selected, mark it
+                        // Service is always pre-selected, mark it and display service card
                         if (self.serviceId) {
                             self.$form.find(`.kab-service-item[data-service-id="${self.serviceId}"]`).addClass('selected');
+                            
+                            // Display service card
+                            const selectedService = response.data.services.find(s => s.id === self.serviceId);
+                            if (selectedService) {
+                                self.displayServiceCard(selectedService);
+                            }
                         }
                         
-                        // Now that services are loaded, show step 1 (therapist selection)
-                        // This ensures we don't try to load specialists before services are ready
-                        // Only go to step 1 if we're still on step 0 (initial state)
-                        if (self.currentStep === 0) {
-                            self.goToStep(1);
+                        // Step 1 is already shown from init(), no need to navigate again
+                        // Just ensure specialists are loaded if we're on step 1
+                        if (self.currentStep === 1) {
+                            self.loadSpecialists();
                         }
                     } else {
                         $servicesList.html('<div class="kab-no-data">' + (response.data?.message || kab_vars.no_services) + '</div>');
@@ -231,11 +243,36 @@
         }
         
         /**
+         * Display service card
+         */
+        displayServiceCard(service) {
+            const $card = this.$form.find('.kab-selected-service-card');
+            
+            if (!$card.length) {
+                return;
+            }
+            
+            // Show the card
+            $card.show();
+            
+            const serviceName = service.name || '';
+            
+            // Set service name
+            $card.find('.kab-service-name').text(serviceName);
+        }
+        
+        /**
          * Load specialists
          */
         loadSpecialists() {
             const self = this;
             const $specialistsList = this.$form.find('.kab-specialists-list');
+            
+            // Prevent multiple simultaneous loads
+            if (this.isLoadingSpecialists) {
+                return;
+            }
+            this.isLoadingSpecialists = true;
             
             $specialistsList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             
@@ -245,7 +282,9 @@
                 data: {
                     action: 'kab_get_specialists',
                     service_id: this.serviceId,
-                    specialist_id: this.specialistId,
+                    // Don't send specialist_id when loading for display - we want all specialists
+                    // specialist_id is only used when pre-selecting from button
+                    specialist_id: '',
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
@@ -253,23 +292,16 @@
                         // Store specialists for random selection
                         self.specialists = response.data.specialists;
                         
-                        let sliderHtml = '<div class="kab-specialists-slider">';
-                        
-                        // Add slider navigation arrows
-                        sliderHtml += '<div class="kab-slider-arrow kab-slider-prev"><img src="' + kab_vars.plugin_url + 'frontend/assets/images/arrow-left.png" alt="Flere terapeuter"></div>';
-                        sliderHtml += '<div class="kab-slider-arrow kab-slider-next"><img src="' + kab_vars.plugin_url + 'frontend/assets/images/arrow-right.png" alt="Flere terapeuter"></div>';
-                        
-                        $.each(response.data.specialists, function(index, specialist) {
+                        // Build HTML more efficiently using array map
+                        const cardsHtml = response.data.specialists.map((specialist, index) => {
                             // Extract tags from specialist data
                             let tagsHtml = '';
                             const tags = self.getSpecialistTags(specialist);
                             
                             if (tags && tags.length > 0) {
-                                tagsHtml = '<div class="kab-therapist-tags">';
-                                tags.forEach(tag => {
-                                    tagsHtml += `<span class="kab-therapist-tag">${tag}</span>`;
-                                });
-                                tagsHtml += '</div>';
+                                tagsHtml = '<div class="kab-therapist-tags">' +
+                                    tags.map(tag => `<span class="kab-therapist-tag">${tag}</span>`).join('') +
+                                    '</div>';
                             }
                             
                             // Create truncated description with "Les mer" link if description is long
@@ -280,14 +312,14 @@
                                     ? specialist.description.substring(0, maxLength) + '...' 
                                     : specialist.description;
                                 
-                                descriptionHtml = `
-                                    <p class="kab-specialist-description">${shortDesc}</p>
-                                    ${specialist.description.length > maxLength ? '<a href="#" class="kab-read-more">Les mer</a>' : ''}
-                                `;
+                                descriptionHtml = `<p class="kab-specialist-description">${shortDesc}</p>` +
+                                    (specialist.description.length > maxLength ? '<a href="#" class="kab-read-more">Les mer</a>' : '');
                             }
                             
-                            sliderHtml += `
-                                <div class="kab-specialist-card" data-specialist-id="${specialist.id}" data-index="${index}">
+                            // Hide all cards except the first one initially to prevent blinking
+                            const displayStyle = index === 0 ? '' : 'style="display: none;"';
+                            return `
+                                <div class="kab-specialist-card" data-specialist-id="${specialist.id}" data-index="${index}" ${displayStyle}>
                                     <div class="kab-specialist-card-inner">
                                         <div class="kab-specialist-image">
                                             <img src="${specialist.image_url || specialist.profile_image || specialist.image || 'https://via.placeholder.com/100'}" alt="${specialist.name}">
@@ -304,43 +336,56 @@
                                     </div>
                                 </div>
                             `;
-                        });
+                        }).join('');
                         
-                        sliderHtml += '</div>';
+                        // Build complete slider HTML
+                        let sliderHtml = '<div class="kab-specialists-slider">' +
+                            '<div class="kab-slider-arrow kab-slider-prev"><img src="' + kab_vars.plugin_url + 'frontend/assets/images/arrow-left.png" alt="Flere terapeuter"></div>' +
+                            '<div class="kab-slider-arrow kab-slider-next"><img src="' + kab_vars.plugin_url + 'frontend/assets/images/arrow-right.png" alt="Flere terapeuter"></div>' +
+                            cardsHtml +
+                            '</div>';
+                        
+                        // Render HTML
                         $specialistsList.html(sliderHtml);
                         
-                        // Initialize slider functionality
-                        setTimeout(() => {
+                        // Initialize slider immediately using requestAnimationFrame for smooth rendering
+                        // This ensures DOM is ready but doesn't cause visible delay
+                        requestAnimationFrame(() => {
                             self.initSpecialistSlider();
-                        }, 100);
-                        
-                        // If we have a preselected specialist, select it (but NEVER auto-advance)
-                        if (self.specialistId) {
-                            // Select specialist WITHOUT auto-advance - form must stay on step 1
-                            // Use setTimeout to ensure this happens after any other async operations
-                            setTimeout(() => {
-                                self.selectSpecialist(self.specialistId, false);
-                                // CRITICAL: Force stay on step 1 - never auto-advance when pre-selected
-                                if (self.currentStep !== 1) {
-                                    self.goToStep(1);
+                            
+                            // If we have a selected specialist (from user selection or pre-selection), visually select it
+                            // This handles both pre-selected specialists (from button) and user-selected ones (when navigating back)
+                            if (self.specialistId) {
+                                // Check if the selected specialist exists in the loaded list
+                                const selectedSpecialist = response.data.specialists.find(spec => spec.id === self.specialistId);
+                                if (selectedSpecialist) {
+                                    // Visually select it but don't auto-advance
+                                    self.$form.find('.kab-specialist-card').removeClass('selected');
+                                    self.$form.find(`.kab-specialist-card[data-specialist-id="${self.specialistId}"]`).addClass('selected');
+                                    
+                                    // If it's not the first card, show it in the slider
+                                    const $selectedCard = self.$form.find(`.kab-specialist-card[data-specialist-id="${self.specialistId}"]`);
+                                    const cardIndex = $selectedCard.data('index') || 0;
+                                    if (cardIndex > 0) {
+                                        // Update slider to show selected card
+                                        const $slider = self.$form.find('.kab-specialists-slider');
+                                        const $cards = $slider.find('.kab-specialist-card');
+                                        $cards.hide();
+                                        $cards.eq(cardIndex).show();
+                                    }
                                 }
-                            }, 100);
-                        }
-                        
-                        // CRITICAL: Ensure we're still on step 1 after loading specialists
-                        // This prevents any accidental auto-advance to step 2
-                        // Force stay on step 1 - user must manually proceed
-                        setTimeout(() => {
-                            if (self.currentStep !== 1) {
-                                self.goToStep(1);
                             }
-                        }, 150);
+                            
+                            self.isLoadingSpecialists = false;
+                        });
                     } else {
                         $specialistsList.html('<div class="kab-no-data">' + kab_vars.no_specialists + '</div>');
+                        self.isLoadingSpecialists = false;
                     }
                 },
                 error: function() {
                     $specialistsList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                    self.isLoadingSpecialists = false;
                 }
             });
         }
@@ -348,34 +393,21 @@
         /**
          * Extract tags from specialist data
          */
+        /**
+         * Extract tags from specialist data
+         * Only returns tags stored in the database (admin-managed)
+         * 
+         * @param {Object} specialist The specialist data object
+         * @returns {Array} Array of tag strings
+         */
         getSpecialistTags(specialist) {
-            const tags = [];
-            
+            // Only return tags from database (admin-managed)
             if (specialist.stored_tags && Array.isArray(specialist.stored_tags) && specialist.stored_tags.length > 0) {
                 return specialist.stored_tags;
             }
             
-            if (specialist.categories && Array.isArray(specialist.categories)) {
-                specialist.categories.forEach(category => {
-                    if (typeof category === 'string') {
-                        tags.push(category);
-                    } else if (category.name) {
-                        tags.push(category.name);
-                    }
-                });
-            }
-            
-            if (specialist.specialties && Array.isArray(specialist.specialties)) {
-                specialist.specialties.forEach(specialty => {
-                    if (typeof specialty === 'string') {
-                        tags.push(specialty);
-                    } else if (specialty.name) {
-                        tags.push(specialty.name);
-                    }
-                });
-            }
-            
-            return tags;
+            // Return empty array if no tags in database
+            return [];
         }
         
         /**
@@ -393,7 +425,13 @@
             let currentIndex = 0;
             const totalSlides = $cards.length;
             
-            $cards.hide().eq(currentIndex).show();
+            // Cards are already hidden except the first one (set in HTML during rendering)
+            // Just verify the first one is visible - don't manipulate all cards to avoid flickering
+            // Only ensure first card is visible if somehow it got hidden
+            const $firstCard = $cards.eq(currentIndex);
+            if ($firstCard.is(':hidden')) {
+                $firstCard.show();
+            }
             
             const updateSlider = () => {
                 $cards.fadeOut(200).promise().done(function() {

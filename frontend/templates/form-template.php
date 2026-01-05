@@ -14,6 +14,7 @@ $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 // Get pre-selected values
 $preselected_service = isset($atts['service_id']) ? $atts['service_id'] : '';
 $preselected_specialist = isset($atts['id']) ? $atts['id'] : '';
+$preselected_location = isset($atts['location_id']) ? $atts['location_id'] : '';
 
 // Form classes
 $form_classes = array('kab-booking-form');
@@ -22,7 +23,8 @@ $form_classes[] = 'kab-context-' . $context;
 
 <div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>" 
     data-service-id="<?php echo esc_attr($preselected_service); ?>" 
-    data-specialist-id="<?php echo esc_attr($preselected_specialist); ?>">
+    data-specialist-id="<?php echo esc_attr($preselected_specialist); ?>"
+    data-location-id="<?php echo esc_attr($preselected_location); ?>">
     
     <div class="kab-form-progress">
         <div class="kab-progress-text">1/5</div>

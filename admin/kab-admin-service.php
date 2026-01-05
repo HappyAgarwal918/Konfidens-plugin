@@ -334,9 +334,10 @@ function kab_get_services_with_priority() {
         foreach ($services_response['data'] as $service) {
             $priority = kab_get_service_priority($service['id']);
             
-            // Only include services that have a priority set (not null or empty)
-            if ($priority !== null && $priority !== '') {
+            // Only include services that have a priority set (not null)
+            if ($priority !== null) {
                 $service['priority'] = $priority;
+                
                 // Get price from API only (prices are fetched from Konfidens API, not stored in database)
                 // Helper function to safely extract price (handles arrays and objects)
                 // Also converts from cents to main currency unit if needed
@@ -440,13 +441,24 @@ function kab_update_service_priority() {
     $service_id = sanitize_text_field($_POST['service_id']);
     $priority_input = isset($_POST['priority']) ? $_POST['priority'] : '';
     // Convert to integer if set, otherwise null (allow clearing priority)
-    $priority = ($priority_input !== '' && $priority_input !== null && $priority_input !== '0') ? intval($priority_input) : null;
+    // Allow 0 as a valid priority value
+    $priority = ($priority_input !== '' && $priority_input !== null) ? intval($priority_input) : null;
     
     // Get existing locations to preserve them
     $existing_locations = kab_get_service_locations($service_id);
     $location_ids = isset($_POST['location_ids']) && $_POST['location_ids'] !== '' 
         ? sanitize_text_field($_POST['location_ids']) 
         : (!empty($existing_locations) ? implode(',', $existing_locations) : '');
+    
+    // Ensure service entry exists (create if it doesn't)
+    $existing_locations_check = kab_get_service_locations($service_id);
+    if (empty($existing_locations_check) && $location_ids === '') {
+        // Service entry doesn't exist, create it first with empty location_ids
+        kab_add_update_service_location($service_id, '', null);
+        // Re-fetch locations after creation
+        $existing_locations = kab_get_service_locations($service_id);
+        $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
+    }
     
     // Update service priority
     $result = kab_add_update_service_location($service_id, $location_ids, $priority);

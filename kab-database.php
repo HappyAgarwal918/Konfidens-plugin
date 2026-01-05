@@ -269,28 +269,47 @@ function kab_add_update_service_location($service_id, $location_ids, $priority =
     $priority_value = ($priority !== null && $priority !== '') ? intval($priority) : null;
     
     if ($existing) {
-        return $wpdb->update(
-            $table_name,
-            array(
-                'location_ids' => sanitize_text_field($location_ids),
-                'priority' => $priority_value
-            ),
-            array('service_id' => $service_id),
-            array('%s', '%d'),
-            array('%s')
-        );
+        // For update, we need to handle NULL properly
+        if ($priority_value === null) {
+            // Use raw SQL to set NULL
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, priority = NULL WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $service_id
+            ));
+            return $result !== false;
+        } else {
+            // Use raw SQL to ensure proper update (wpdb->update can return 0 if no change, which is falsy)
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, priority = %d WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $priority_value,
+                $service_id
+            ));
+            return $result !== false;
+        }
     } else {
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'service_id' => sanitize_text_field($service_id),
-                'location_ids' => sanitize_text_field($location_ids),
-                'priority' => $priority_value
-            ),
-            array('%s', '%s', '%d')
-        );
-        
-        return $result ? $wpdb->insert_id : false;
+        // For insert, we need to handle NULL properly
+        if ($priority_value === null) {
+            // Use raw SQL to insert NULL
+            $result = $wpdb->query($wpdb->prepare(
+                "INSERT INTO $table_name (service_id, location_ids, priority) VALUES (%s, %s, NULL)",
+                sanitize_text_field($service_id),
+                sanitize_text_field($location_ids)
+            ));
+            return $result ? $wpdb->insert_id : false;
+        } else {
+            $result = $wpdb->insert(
+                $table_name,
+                array(
+                    'service_id' => sanitize_text_field($service_id),
+                    'location_ids' => sanitize_text_field($location_ids),
+                    'priority' => $priority_value
+                ),
+                array('%s', '%s', '%d')
+            );
+            return $result ? $wpdb->insert_id : false;
+        }
     }
 }
 

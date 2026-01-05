@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.0');
+define('KAB_VERSION', '1.0.4');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -281,47 +281,18 @@ function kab_api_request($endpoint, $args = array(), $method = 'GET') {
  * Register shortcodes
  */
 function kab_register_shortcodes() {
-    add_shortcode('kab_appointment_form', 'kab_appointment_form_shortcode');
     add_shortcode('su_button', 'kab_button_shortcode');
 }
 add_action('init', 'kab_register_shortcodes');
 
 /**
- * Appointment form shortcode
- */
-function kab_appointment_form_shortcode($atts) {
-    $atts = shortcode_atts(
-        array(
-            'context' => 'sidebar', // sidebar or popup
-            'therapist_id' => '', // For therapist-first flow
-            'service_id' => '', // For service & therapist first flow or regular flow
-            'flow' => '', // Form flow type: 'therapist-first', 'service-therapist-first', or default
-        ),
-        $atts,
-        'kab_appointment_form'
-    );
-    
-    // Start output buffering
-    ob_start();
-    
-    // Determine which template to use based on flow type
-    if ($atts['flow'] === 'service-therapist-first') {
-        // Service & Therapist First flow - pass service_id and therapist_id
-        include KAB_PLUGIN_DIR . 'frontend/templates/form-template-service-therapist-first.php';
-    } elseif (!empty($atts['therapist_id'])) {
-        // Therapist First flow
-        include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
-    } else {
-        // Regular form template
-        include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
-    }
-    
-    // Return buffered content
-    return ob_get_clean();
-}
-
-/**
  * Button shortcode
+ * 
+ * [su_button]Book Now[/su_button] - Full flow: Service → Location → Therapist → Date & Time → Personal Details
+ * [su_button service_id="SERVICE_ID"]Book This Service[/su_button] - Service pre-selected: Service → Location → Therapist → Date & Time → Personal Details
+ * [su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button] - Service and Location pre-selected: Service → Location (pre-selected) → Therapist → Date & Time → Personal Details
+ * [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button] - Therapist pre-selected: Therapist → Services → Location → Date & Time → Personal Details
+ * [su_button flow="service-therapist-first" service_id="SERVICE_ID"]Book Appointment[/su_button] - Service pre-selected: Service → Therapist (according to service) → Location → Date & Time → Personal Details
  */
 function kab_button_shortcode($atts, $content = null) {
     $atts = shortcode_atts(
@@ -329,8 +300,9 @@ function kab_button_shortcode($atts, $content = null) {
             'background' => '',
             'class' => '',
             'service_id' => '',
+            'location_id' => '',
             'id' => '', // specialist_id
-            'flow' => '', // Form flow type: 'therapist-first', 'service-therapist-first', or default
+            'flow' => '', // Form flow type: 'service-therapist-first'
         ),
         $atts,
         'su_button'
@@ -381,32 +353,28 @@ function kab_button_shortcode($atts, $content = null) {
             <button class="kab-popup-close">&times;</button>
             <div class="kab-popup-inner">
                 <?php 
-                // Determine which template to use based on flow type
-                if ($atts['flow'] === 'service-therapist-first') {
-                    // Service & Therapist First flow
-                    $form_atts = array('context' => 'popup', 'flow' => 'service-therapist-first');
-                    if (!empty($atts['service_id'])) {
-                        $form_atts['service_id'] = $atts['service_id'];
-                    }
-                    if (!empty($atts['id'])) {
-                        $form_atts['therapist_id'] = $atts['id'];
-                    }
+                // Determine which template to use based on parameters
+                if ($atts['flow'] === 'service-therapist-first' && !empty($atts['service_id'])) {
+                    // Service pre-selected with service-therapist-first flow: Service → Therapist (according to service) → Location → Date & Time → Personal Details
+                    $form_atts = array('context' => 'popup', 'flow' => 'service-therapist-first', 'service_id' => $atts['service_id']);
                     $atts = $form_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-service-therapist-first.php';
                 } elseif (!empty($atts['id'])) {
-                    // Therapist First flow
+                    // Therapist First flow: Therapist is pre-selected → show services according to therapist → Location → Date & Time → Personal Details
                     $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
                     $atts = $therapist_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
+                } elseif (!empty($atts['service_id'])) {
+                    // Service pre-selected: Service → Location → Therapist → Date & Time → Personal Details
+                    $form_atts = array('context' => 'popup', 'service_id' => $atts['service_id']);
+                    if (!empty($atts['location_id'])) {
+                        $form_atts['location_id'] = $atts['location_id'];
+                    }
+                    $atts = $form_atts;
+                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
                 } else {
-                    // Regular form template
+                    // Regular form template: Service → Location → Therapist → Date & Time → Personal Details
                     $form_atts = array('context' => 'popup');
-                    if (!empty($atts['service_id'])) {
-                        $form_atts['service_id'] = $atts['service_id'];
-                    }
-                    if (!empty($atts['id'])) {
-                        $form_atts['id'] = $atts['id']; // specialist_id
-                    }
                     $atts = $form_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
                 }

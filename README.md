@@ -128,11 +128,22 @@ The plugin communicates with the Konfidens API using the following endpoints:
 
 ### Shortcodes
 
-1. **`[kab_appointment_form]`**: Displays the main booking form
-   - Parameters: `context` (sidebar/popup)
+1. **`[su_button]Book Now[/su_button]`**: Creates a button that opens the booking form in a popup
+   - Flow: Service → Location → Therapist → Date & Time → Personal Details
 
-2. **`[su_button]`**: Creates a button that opens the booking popup
-   - Parameters: `background`, `class`, `service_id`, `id` (specialist_id)
+2. **`[su_button service_id="SERVICE_ID"]Book This Service[/su_button]`**: Creates a button with pre-selected service
+   - Flow: Service (pre-selected) → Location → Therapist → Date & Time → Personal Details
+
+2a. **`[su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button]`**: Creates a button with pre-selected service and location
+   - Flow: Service (pre-selected) → Location (pre-selected) → Therapist → Date & Time → Personal Details
+
+3. **`[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]`**: Creates a button with pre-selected therapist
+   - Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details
+   - Note: Therapist can be changed during the booking process
+
+4. **`[su_button flow="service-therapist-first" service_id="SERVICE_ID"]Book Appointment[/su_button]`**: Creates a button with pre-selected service (opens in popup)
+   - Flow: Service (pre-selected) → Therapist (according to service) → Location → Date & Time → Personal Details
+   - Note: You can customize the button text
 
 ### multistep form
 step 1. **Service Selection**: Shows all available services
@@ -207,17 +218,9 @@ The plugin is organized into the following structure:
 
 ## Usage
 
-### Basic Form
+### Popup Form Buttons
 
-Add the appointment form to any page or post using the shortcode:
-
-```
-[kab_appointment_form]
-```
-
-### Popup Form
-
-Add a button that opens the booking form in a popup:
+Add a button that opens the booking form in a popup with full flow:
 
 ```
 [su_button]Book Now[/su_button]
@@ -229,10 +232,22 @@ To pre-select a specific service:
 [su_button service_id="SERVICE_ID"]Book This Service[/su_button]
 ```
 
+To pre-select both service and location:
+
+```
+[su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button]
+```
+
 To pre-select a specific therapist:
 
 ```
 [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]
+```
+
+To pre-select a service with service-therapist-first flow (shows therapists according to service):
+
+```
+[su_button flow="service-therapist-first" service_id="SERVICE_ID"]Book Appointment[/su_button]
 ```
 
 ## Email Notifications

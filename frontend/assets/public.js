@@ -17,18 +17,111 @@
         constructor($form) {
             this.$form = $form;
             this.currentStep = 1;
-            this.maxStep = 5; // Steps 1-5 are counted, step 6 (confirmation) is not
+            this.currentLogicalStep = 1;
+            this.isNavigating = false; // Flag to prevent rapid navigation
+            this.lastNavigationTime = 0; // Track last navigation time
             
             this.serviceId = $form.data('service-id') || '';
             this.specialistId = $form.data('specialist-id') || '';
-            this.locationId = '';
+            // Ensure locationId is stored as string for consistency
+            const locationIdData = $form.data('location-id') || '';
+            this.locationId = locationIdData ? String(locationIdData) : '';
+            // Store original pre-selected location ID to distinguish from user-selected
+            this.preselectedLocationId = locationIdData ? String(locationIdData) : '';
             this.selectedDate = '';
             this.selectedTime = '';
             this.services = []; // Store services data with prices
             this.locations = []; // Store locations data
             this.specialists = []; // Store specialists data for random selection
+            this.isInitialLoad = true; // Flag to track if this is the initial load
+            this.isLoadingSpecialists = false; // Flag to prevent multiple simultaneous specialist loads
+            
+            // Determine which steps are visible and create step mapping
+            this.setupStepMapping();
             
             this.init();
+        }
+        
+        /**
+         * Setup step mapping based on pre-selected values
+         * Maps logical step numbers (1, 2, 3...) to actual step numbers (1, 2, 3, 4, 5)
+         */
+        setupStepMapping() {
+            // Define which actual steps should be visible
+            // Step 1: Service Selection
+            // Step 2: Location Selection
+            // Step 3: Specialist Selection
+            // Step 4: Date & Time Selection
+            // Step 5: Personal Details
+            // Step 6: Confirmation (not counted in progress)
+            
+            this.visibleSteps = [];
+            this.stepMapping = {}; // Maps logical step number to actual step number
+            this.reverseMapping = {}; // Maps actual step number to logical step number
+            
+            // Step 1: Service Selection (only if service is not pre-selected)
+            if (!this.serviceId) {
+                this.visibleSteps.push(1);
+                this.stepMapping[this.visibleSteps.length] = 1;
+                this.reverseMapping[1] = this.visibleSteps.length;
+            }
+            
+            // Step 2: Location Selection (only if location is not pre-selected)
+            if (!this.locationId) {
+                this.visibleSteps.push(2);
+                this.stepMapping[this.visibleSteps.length] = 2;
+                this.reverseMapping[2] = this.visibleSteps.length;
+            }
+            
+            // Step 3: Specialist Selection (always visible)
+            this.visibleSteps.push(3);
+            this.stepMapping[this.visibleSteps.length] = 3;
+            this.reverseMapping[3] = this.visibleSteps.length;
+            
+            // Step 4: Date & Time Selection (always visible)
+            this.visibleSteps.push(4);
+            this.stepMapping[this.visibleSteps.length] = 4;
+            this.reverseMapping[4] = this.visibleSteps.length;
+            
+            // Step 5: Personal Details (always visible)
+            this.visibleSteps.push(5);
+            this.stepMapping[this.visibleSteps.length] = 5;
+            this.reverseMapping[5] = this.visibleSteps.length;
+            
+            // Set maxStep based on visible steps
+            this.maxStep = this.visibleSteps.length;
+            
+            // Hide steps that are not visible
+            this.hideSkippedSteps();
+        }
+        
+        /**
+         * Hide steps that are skipped due to pre-selection
+         */
+        hideSkippedSteps() {
+            // Hide service step if service is pre-selected
+            if (this.serviceId) {
+                this.$form.find('.kab-form-step[data-step="1"]').hide();
+            }
+            
+            // Hide location step if location is pre-selected
+            if (this.locationId) {
+                this.$form.find('.kab-form-step[data-step="2"]').hide();
+            }
+        }
+        
+        /**
+         * Get logical step number from actual step number
+         */
+        getLogicalStep(actualStep) {
+            return this.reverseMapping[actualStep] || actualStep;
+        }
+        
+        /**
+         * Get actual step number from logical step number
+         */
+        getActualStep(logicalStep) {
+            return this.stepMapping[logicalStep] || logicalStep;
         }
         
         /**
@@ -38,21 +131,67 @@
             // Hide all steps initially
             this.$form.find('.kab-form-step').hide();
             
-            // If serviceId is set, go directly to step 2, otherwise show step 1
-            if (this.serviceId) {
-                this.goToStep(2);
+            // Determine which logical step to show first
+            let firstLogicalStep = 1;
+            
+            if (this.serviceId && this.locationId) {
+                // Both service and location are pre-selected, start at therapist selection (logical step 1 = actual step 3)
+                firstLogicalStep = this.getLogicalStep(3);
+            } else if (this.serviceId) {
+                // Only service is pre-selected, start at location selection (logical step 1 = actual step 2)
+                firstLogicalStep = this.getLogicalStep(2);
             } else {
-                this.goToStep(1);
+                // Nothing pre-selected, start at service selection (logical step 1 = actual step 1)
+                firstLogicalStep = this.getLogicalStep(1);
             }
+            
+            // Go to the first logical step (which will show the correct actual step)
+            this.goToLogicalStep(firstLogicalStep);
             
             this.initEvents();
             this.loadServices();
+            
+            // Locations will be loaded after services are loaded if location is pre-selected
             
             // If specialist ID is preselected
             if (this.specialistId) {
                 // Will be handled after services are loaded
                 this.preselectedSpecialist = true;
             }
+        }
+        
+        /**
+         * Load locations data for summary (when location step is skipped)
+         */
+        loadCategoriesForSummary() {
+            const self = this;
+            
+            // Prepare location_id - convert to integer if it's a string, or use 0 if empty
+            let locationId = this.locationId;
+            if (locationId && typeof locationId === 'string') {
+                locationId = parseInt(locationId, 10) || 0;
+            } else if (!locationId) {
+                locationId = 0;
+            }
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_locations',
+                    service_id: this.serviceId,
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data.locations) {
+                        // Store locations data for summary
+                        self.locations = response.data.locations;
+                    }
+                },
+                error: function() {
+                    // Silently fail - locations just won't show in summary
+                }
+            });
         }
         
         /**
@@ -70,14 +209,11 @@
             // Category selection
             this.$form.on('click', '.kab-category-item', function() {
                 const locationId = $(this).data('location-id');
-                self.selectLocation(locationId);
+                // User manually selected location, so auto-advance
+                self.selectLocation(locationId, true);
             });
             
-            // Specialist selection
-            this.$form.on('click', '.kab-specialist-card', function() {
-                const specialistId = $(this).data('specialist-id');
-                self.selectSpecialist(specialistId);
-            });
+            // Specialist selection - handled later in loadSpecialists to avoid conflicts
             
             // Day selection
             this.$form.on('click', '.kab-day:not(.empty):not(.disabled)', function() {
@@ -193,28 +329,33 @@
                         // Store services data for later use (including prices)
                         self.services = response.data.services;
                         
-                        let html = '';
-                        
-                        $.each(response.data.services, function(index, service) {
-                            html += `
-                                <div class="kab-service-item" data-service-id="${service.id}">
-                                    <div class="kab-service-info">
-                                        <p>${service.name}</p>
-                                    </div>
+                        // Build HTML more efficiently using array map and join
+                        const html = response.data.services.map(service => 
+                            `<div class="kab-service-item" data-service-id="${service.id}">
+                                <div class="kab-service-info">
+                                    <p>${service.name}</p>
                                 </div>
-                            `;
-                        });
+                            </div>`
+                        ).join('');
                         
+                        // Render services immediately without delay
                         $servicesList.html(html);
                         
                         // If service is preselected
                         if (self.serviceId) {
                             self.$form.find(`.kab-service-item[data-service-id="${self.serviceId}"]`).addClass('selected');
                             self.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
-                            // Navigate to location step (step 2) without skipping it
-                            setTimeout(() => {
-                                self.goToStep(2);
-                            }, 100);
+                            
+                            // If location is also preselected, load locations data for summary
+                            if (self.locationId) {
+                                // Load locations in background so they're available for summary
+                                self.loadCategoriesForSummary();
+                                // Both service and location are preselected, go to therapist step immediately
+                                self.goToLogicalStep(self.getLogicalStep(3));
+                            } else {
+                                // Only service is preselected, go to location step immediately
+                                self.goToLogicalStep(self.getLogicalStep(2));
+                            }
                         }
                         
                         // If specialist is preselected
@@ -225,7 +366,8 @@
                                 self.$form.find(`.kab-service-item[data-service-id="${self.serviceId}"]`).addClass('selected');
                                 self.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
                             }
-                            self.goToStep(2);
+                            // Go to location step using logical step immediately
+                            self.goToLogicalStep(self.getLogicalStep(2));
                         }
                     } else {
                         $servicesList.html('<div class="kab-no-data">' + kab_vars.no_services + '</div>');
@@ -271,11 +413,27 @@
                         
                         $categoriesList.html(html);
                         
-                        // If we have a preselected specialist, auto-select the first category
-                        if (self.preselectedSpecialist && self.specialistId && response.data.locations.length > 0) {
-                            self.selectLocation(response.data.locations[0].id);
-                            self.nextStep();
+                        // If we have a preselected location, auto-select it and advance
+                        // Only auto-advance if location was pre-selected from button, not if user selected it
+                        if (self.locationId) {
+                            // Check if the preselected location exists in the loaded locations
+                            const preselectedLocation = response.data.locations.find(loc => {
+                                return String(loc.id) === String(self.locationId) || loc.id == self.locationId;
+                            });
+                            if (preselectedLocation) {
+                                // Only auto-advance if this location was pre-selected from button
+                                // If user selected it and navigated back, just show it selected without advancing
+                                const wasPreselected = self.preselectedLocationId && 
+                                    String(self.locationId) === String(self.preselectedLocationId);
+                                self.selectLocation(self.locationId, wasPreselected);
+                            }
+                        } else if (self.preselectedSpecialist && self.specialistId && response.data.locations.length > 0) {
+                            // If we have a preselected specialist, auto-select the first category
+                            self.selectLocation(response.data.locations[0].id, true);
                         }
+                        
+                        // Mark that initial load is complete
+                        self.isInitialLoad = false;
                     } else {
                         $categoriesList.html('<div class="kab-no-data">No locations available for this service.</div>');
                     }
@@ -293,7 +451,28 @@
             const self = this;
             const $specialistsList = this.$form.find('.kab-specialists-list');
             
+            // Prevent multiple simultaneous loads
+            if (this.isLoadingSpecialists) {
+                return;
+            }
+            this.isLoadingSpecialists = true;
+            
+            // Ensure we have required data
+            if (!this.serviceId) {
+                $specialistsList.html('<div class="kab-no-data">' + kab_vars.select_service + '</div>');
+                this.isLoadingSpecialists = false;
+                return;
+            }
+            
             $specialistsList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
+            // Prepare location_id - convert to integer if it's a string, or use 0 if empty
+            let locationId = this.locationId;
+            if (locationId && typeof locationId === 'string') {
+                locationId = parseInt(locationId, 10) || 0;
+            } else if (!locationId) {
+                locationId = 0;
+            }
             
             $.ajax({
                 url: kab_vars.ajax_url,
@@ -301,8 +480,10 @@
                 data: {
                     action: 'kab_get_specialists',
                     service_id: this.serviceId,
-                    location_id: this.locationId,
-                    specialist_id: this.specialistId,
+                    location_id: locationId,
+                    // Don't send specialist_id when loading for display - we want all specialists
+                    // specialist_id is only used when pre-selecting from button
+                    specialist_id: '',
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
@@ -343,8 +524,10 @@
                                 `;
                             }
                             
+                            // Hide all cards except the first one initially to prevent blinking
+                            const displayStyle = index === 0 ? '' : 'style="display: none;"';
                             sliderHtml += `
-                                <div class="kab-specialist-card" data-specialist-id="${specialist.id}" data-index="${index}">
+                                <div class="kab-specialist-card" data-specialist-id="${specialist.id}" data-index="${index}" ${displayStyle}>
                                     <div class="kab-specialist-card-inner">
                                         <div class="kab-specialist-image">
                                             <img src="${specialist.image_url || specialist.profile_image || specialist.image || 'https://via.placeholder.com/100'}" alt="${specialist.name}">
@@ -367,83 +550,78 @@
                         
                         sliderHtml += '</div>';
                         
+                        // Render HTML
                         $specialistsList.html(sliderHtml);
                         
-                        // Initialize slider functionality with a slight delay to ensure DOM is ready
-                        setTimeout(() => {
+                        // Initialize slider immediately using requestAnimationFrame for smooth rendering
+                        // This ensures DOM is ready but doesn't cause visible delay
+                        requestAnimationFrame(() => {
                             self.initSpecialistSlider();
-                        }, 100);
+                            self.isLoadingSpecialists = false;
+                        });
                         
-                        // If we have a preselected specialist, select it
-                        if (self.specialistId) {
-                            self.selectSpecialist(self.specialistId);
-                            
-                            if (self.preselectedSpecialist) {
+                        // If we have a preselected specialist (from button), select it and auto-advance
+                        if (self.specialistId && self.preselectedSpecialist && self.currentStep === 3) {
+                            // Check if the preselected specialist exists in the loaded list
+                            const preselectedSpecialist = response.data.specialists.find(spec => spec.id === self.specialistId);
+                            if (preselectedSpecialist) {
+                                self.selectSpecialist(self.specialistId);
                                 self.preselectedSpecialist = false;
-                                self.nextStep();
+                                // Auto-advance only if it was pre-selected from button
+                                setTimeout(() => {
+                                    if (self.currentStep === 3) {
+                                        self.nextStep();
+                                    }
+                                }, 300);
+                            } else {
+                                // Specialist not found, clear the selection
+                                self.specialistId = '';
+                                self.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', false);
                             }
+                        } else if (self.specialistId) {
+                            // User had selected a specialist before going back - just mark it as selected visually
+                            // Check if the selected specialist exists in the loaded list
+                            const selectedSpecialist = response.data.specialists.find(spec => spec.id === self.specialistId);
+                            if (selectedSpecialist) {
+                                self.selectSpecialist(self.specialistId);
+                            } else {
+                                // Selected specialist no longer available, clear selection
+                                self.specialistId = '';
+                                self.$form.find('.kab-specialist-card').removeClass('selected');
+                            }
+                            // Enable next button since we have a selection
+                            self.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', false);
                         } else {
-                            // Enable next button anyway - we'll auto-select if needed
+                            // No specialist selected, enable next button (will auto-select if needed)
                             self.$form.find('.kab-form-step[data-step="3"] .kab-next-btn').prop('disabled', false);
                         }
                     } else {
                         $specialistsList.html('<div class="kab-no-data">' + kab_vars.no_specialists + '</div>');
+                        self.isLoadingSpecialists = false;
                     }
                 },
                 error: function() {
                     $specialistsList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                    self.isLoadingSpecialists = false;
                 }
             });
         }
         
         /**
          * Extract tags from specialist data
+         * Only returns tags stored in the database (admin-managed)
          * 
          * @param {Object} specialist The specialist data object
          * @returns {Array} Array of tag strings
          */
         getSpecialistTags(specialist) {
-            const tags = [];
-            
-            // 1. First priority: Check for stored tags from database (admin-managed)
+            // Only return tags from database (admin-managed)
             if (specialist.stored_tags && Array.isArray(specialist.stored_tags) && specialist.stored_tags.length > 0) {
                 return specialist.stored_tags;
             }
             
-            // 2. Second priority: Check for categories/specialties directly in the specialist object (from API)
-            if (specialist.categories && Array.isArray(specialist.categories)) {
-                specialist.categories.forEach(category => {
-                    if (typeof category === 'string') {
-                        tags.push(category);
-                    } else if (category.name) {
-                        tags.push(category.name);
-                    }
-                });
-            }
-            
-            // 3. Third priority: Check for specialties (from API)
-            if (specialist.specialties && Array.isArray(specialist.specialties)) {
-                specialist.specialties.forEach(specialty => {
-                    if (typeof specialty === 'string') {
-                        tags.push(specialty);
-                    } else if (specialty.name) {
-                        tags.push(specialty.name);
-                    }
-                });
-            }
-            
-            // 4. Last resort: If no tags found, add some default tags
-            if (tags.length === 0) {
-                // These are example tags from the screenshot
-                const defaultTags = ['Angst', 'Utbrenthet', 'Selvfølelse/selvbilde', 'Psykiske utfordringer', 'Personlig vekst'];
-                
-                // Add 2-4 random tags to make it look natural
-                const numTags = Math.floor(Math.random() * 3) + 2; // 2-4 tags
-                const shuffled = [...defaultTags].sort(() => 0.5 - Math.random());
-                return shuffled.slice(0, numTags);
-            }
-            
-            return tags;
+            // Return empty array if no tags in database
+            return [];
         }
         
         /**
@@ -464,8 +642,13 @@
             let currentIndex = 0;
             const totalSlides = $cards.length;
             
-            // Show only the first card initially
-            $cards.hide().eq(currentIndex).show();
+            // Cards are already hidden except the first one (set in HTML during rendering)
+            // Just verify the first one is visible - don't manipulate all cards to avoid flickering
+            // Only ensure first card is visible if somehow it got hidden
+            const $firstCard = $cards.eq(currentIndex);
+            if ($firstCard.is(':hidden')) {
+                $firstCard.show();
+            }
             
             // Update slider function with animation
             const updateSlider = () => {
@@ -473,6 +656,10 @@
                     $cards.eq(currentIndex).fadeIn(200);
                 });
             };
+            
+            // Remove existing handlers to prevent duplicates
+            $nextBtn.off('click');
+            $prevBtn.off('click');
             
             // Handle next button click
             $nextBtn.on('click', function() {
@@ -486,17 +673,35 @@
                 updateSlider();
             });
             
-            // No dot clicks to handle
+            // Remove existing handlers to prevent duplicates
+            this.$form.off('click', '.kab-select-specialist-btn');
+            this.$form.off('click', '.kab-specialist-card');
             
             // Handle select specialist button clicks - auto advance to next step
-            this.$form.off('click', '.kab-select-specialist-btn').on('click', '.kab-select-specialist-btn', function() {
+            this.$form.on('click', '.kab-select-specialist-btn', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
                 const specialistId = $(this).data('specialist-id');
-                self.selectSpecialist(specialistId);
-                
-                // Auto advance to next step after selecting therapist
-                setTimeout(() => {
-                    self.nextStep();
-                }, 300);
+                if (specialistId) {
+                    self.selectSpecialist(specialistId);
+                    
+                    // Auto advance to next step after selecting therapist
+                    setTimeout(() => {
+                        self.nextStep();
+                    }, 300);
+                }
+            });
+            
+            // Handle specialist card clicks - select but don't auto-advance
+            this.$form.on('click', '.kab-specialist-card', function(e) {
+                // Don't trigger if clicking the button inside
+                if ($(e.target).closest('.kab-select-specialist-btn').length) {
+                    return;
+                }
+                const specialistId = $(this).data('specialist-id');
+                if (specialistId) {
+                    self.selectSpecialist(specialistId);
+                }
             });
             
             // Handle "Les mer" link clicks
@@ -711,6 +916,17 @@
          * Go to next step
          */
         nextStep() {
+            // Prevent multiple rapid step changes (only block if trying to navigate while already navigating to a different step)
+            if (this.isNavigating) {
+                // Allow navigation if it's been more than 200ms since last navigation
+                const now = Date.now();
+                if (this.lastNavigationTime && (now - this.lastNavigationTime) < 200) {
+                    return;
+                }
+            }
+            this.isNavigating = true;
+            this.lastNavigationTime = Date.now();
+            
             // Auto-select a therapist if we're on the therapist step and none is selected
             if (this.currentStep === 3 && !this.specialistId) {
                 const $firstSpecialist = this.$form.find('.kab-specialist-card:first');
@@ -720,48 +936,97 @@
                 }
             }
             
-            if (this.currentStep < this.maxStep) {
-                this.goToStep(this.currentStep + 1);
+            // Get next logical step
+            const nextLogicalStep = this.currentLogicalStep + 1;
+            if (nextLogicalStep <= this.maxStep) {
+                this.goToLogicalStep(nextLogicalStep);
             }
+            
+            // Reset navigation flag after a delay
+            setTimeout(() => {
+                this.isNavigating = false;
+            }, 300);
         }
         
         /**
          * Go to previous step
          */
         prevStep() {
-            if (this.currentStep > 1) {
-                this.goToStep(this.currentStep - 1);
+            // Prevent multiple rapid step changes
+            if (this.isNavigating) {
+                const now = Date.now();
+                if (this.lastNavigationTime && (now - this.lastNavigationTime) < 200) {
+                    return;
+                }
             }
+            this.isNavigating = true;
+            this.lastNavigationTime = Date.now();
+            
+            const prevLogicalStep = this.currentLogicalStep - 1;
+            if (prevLogicalStep >= 1) {
+                this.goToLogicalStep(prevLogicalStep);
+            }
+            
+            // Reset navigation flag after a delay
+            setTimeout(() => {
+                this.isNavigating = false;
+            }, 300);
+        }
+        
+        /**
+         * Go to specific logical step (user-facing step number)
+         * 
+         * @param {number} logicalStep Logical step number (1, 2, 3...)
+         */
+        goToLogicalStep(logicalStep) {
+            // Validate logical step
+            if (logicalStep < 1 || logicalStep > this.maxStep) {
+                return;
+            }
+            
+            // Get the actual step number
+            const actualStep = this.getActualStep(logicalStep);
+            if (!actualStep) {
+                console.warn('Invalid logical step:', logicalStep);
+                return;
+            }
+            
+            this.goToStep(actualStep, logicalStep);
         }
         
         /**
          * Go to specific step
          * 
-         * @param {number} step Step number
+         * @param {number} actualStep Actual step number (1, 2, 3, 4, 5)
+         * @param {number} logicalStep Optional logical step number (for display)
          */
-        goToStep(step) {
+        goToStep(actualStep, logicalStep = null) {
             // Hide all steps
             this.$form.find('.kab-form-step').hide();
             
             // Show the target step
-            this.$form.find(`.kab-form-step[data-step="${step}"]`).show();
+            this.$form.find(`.kab-form-step[data-step="${actualStep}"]`).show();
             
             // Hide progress bar on confirmation step (step 6) - not counted in progress
-            if (step === 6) {
+            if (actualStep === 6) {
                 this.$form.find('.kab-form-progress').hide();
             } else {
                 this.$form.find('.kab-form-progress').show();
-                // Update progress - only count steps 1-5 (step 6 is confirmation, not counted)
-                const progressPercentage = (step / this.maxStep) * 100;
-                this.$form.find('.kab-progress-text').text(`${step}/${this.maxStep}`);
+                // Use logical step for progress display
+                if (logicalStep === null) {
+                    logicalStep = this.getLogicalStep(actualStep);
+                }
+                const progressPercentage = (logicalStep / this.maxStep) * 100;
+                this.$form.find('.kab-progress-text').text(`${logicalStep}/${this.maxStep}`);
                 this.$form.find('.kab-progress-fill').css('width', progressPercentage + '%');
             }
             
-            // Update current step
-            this.currentStep = step;
+            // Update current step (store both actual and logical)
+            this.currentStep = actualStep;
+            this.currentLogicalStep = logicalStep || this.getLogicalStep(actualStep);
             
             // Handle step-specific actions
-            this.handleStepChange(step);
+            this.handleStepChange(actualStep);
         }
         
         /**
@@ -793,8 +1058,12 @@
          * Reset form to initial state
          */
         resetForm() {
-            // Reset all selections except serviceId and specialistId (they come from button)
-            this.locationId = '';
+            // Reset all selections except serviceId, specialistId, and locationId (they come from button/data)
+            // Read locationId from data attribute to restore pre-selected value
+            const locationIdData = this.$form.data('location-id') || '';
+            this.locationId = locationIdData ? String(locationIdData) : '';
+            this.preselectedLocationId = locationIdData ? String(locationIdData) : '';
+            
             this.selectedDate = '';
             this.selectedTime = '';
             
@@ -808,16 +1077,24 @@
             this.$form.find('.kab-next-btn').prop('disabled', true);
             this.$form.find('.kab-prev-btn').prop('disabled', false);
             
-            // If service is preselected, go directly to step 2, otherwise step 1
-            if (this.serviceId) {
-                // Select the service visually
-                this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`).addClass('selected');
-                this.$form.find('.kab-form-step[data-step="1"] .kab-next-btn').prop('disabled', false);
-                // Go directly to step 2 without showing step 1
-                this.goToStep(2);
+            // Recalculate step mapping based on current pre-selected values
+            this.setupStepMapping();
+            
+            // Determine correct initial step based on pre-selected values
+            let firstLogicalStep = 1;
+            if (this.serviceId && this.locationId) {
+                // Both service and location are pre-selected, start at therapist selection
+                firstLogicalStep = this.getLogicalStep(3);
+            } else if (this.serviceId) {
+                // Only service is pre-selected, start at location selection
+                firstLogicalStep = this.getLogicalStep(2);
             } else {
-                this.goToStep(1);
+                // Nothing pre-selected, start at service selection
+                firstLogicalStep = this.getLogicalStep(1);
             }
+            
+            // Go to the correct initial step
+            this.goToLogicalStep(firstLogicalStep);
         }
         
         /**
@@ -845,18 +1122,22 @@
          * Select a location
          * 
          * @param {string} locationId Location ID
+         * @param {boolean} autoAdvance Whether to automatically advance to next step
          */
-        selectLocation(locationId) {
-            this.locationId = locationId;
+        selectLocation(locationId, autoAdvance = true) {
+            // Ensure locationId is stored as string for consistency
+            this.locationId = String(locationId);
             
             // Update UI
             this.$form.find('.kab-category-item').removeClass('selected');
             this.$form.find(`.kab-category-item[data-location-id="${locationId}"]`).addClass('selected');
             
-            // Automatically proceed to next step
-            setTimeout(() => {
-                this.nextStep();
-            }, 300); // Small delay for visual feedback
+            // Automatically proceed to next step if autoAdvance is true
+            if (autoAdvance) {
+                setTimeout(() => {
+                    this.nextStep();
+                }, 300); // Small delay for visual feedback
+            }
         }
         
         /**
@@ -1043,10 +1324,44 @@
                 }
                 // If still empty, try to get from stored locations data
                 if (!locationName && this.locations.length > 0) {
-                    const selectedLocation = this.locations.find(location => location.id == this.locationId);
+                    // Convert locationId to string for comparison
+                    const locationIdStr = String(this.locationId);
+                    const selectedLocation = this.locations.find(location => {
+                        // Try both string and number comparison
+                        return String(location.id) === locationIdStr || location.id == this.locationId;
+                    });
                     if (selectedLocation && selectedLocation.location_name) {
                         locationName = selectedLocation.location_name;
                     }
+                }
+                
+                // If still empty and we have locationId, try to load locations if not already loaded
+                if (!locationName && this.locations.length === 0 && this.serviceId) {
+                    // Load locations synchronously for summary
+                    const self = this;
+                    $.ajax({
+                        url: kab_vars.ajax_url,
+                        type: 'POST',
+                        async: false, // Synchronous to get the data immediately
+                        data: {
+                            action: 'kab_get_locations',
+                            service_id: this.serviceId,
+                            nonce: kab_vars.nonce
+                        },
+                        success: function(response) {
+                            if (response.success && response.data.locations) {
+                                self.locations = response.data.locations;
+                                // Try to find location again
+                                const locationIdStr = String(self.locationId);
+                                const selectedLocation = self.locations.find(location => {
+                                    return String(location.id) === locationIdStr || location.id == self.locationId;
+                                });
+                                if (selectedLocation && selectedLocation.location_name) {
+                                    locationName = selectedLocation.location_name;
+                                }
+                            }
+                        }
+                    });
                 }
             }
             
@@ -1246,8 +1561,9 @@
             const popupId = $button.data('popup-target');
             const $popup = $('#' + popupId);
             
-            // Get service_id and specialist_id from button
+            // Get service_id, location_id, and specialist_id from button
             const serviceId = $button.data('service-id') || '';
+            const locationId = $button.data('location-id') || '';
             const specialistId = $button.data('specialist-id') || '';
             
             // Show popup
@@ -1272,6 +1588,9 @@
                 if (serviceId) {
                     $form.attr('data-service-id', serviceId);
                 }
+                if (locationId) {
+                    $form.attr('data-location-id', locationId);
+                }
                 if (specialistId) {
                     $form.attr('data-specialist-id', specialistId);
                 }
@@ -1282,32 +1601,57 @@
                     formInstance = new KABBookingForm($form);
                     $form.data('kab-form-instance', formInstance);
                 } else {
-                    // Reset form state when reopening popup
-                    // But preserve serviceId and specialistId if they're being set
-                    const currentServiceId = formInstance.serviceId;
-                    const currentSpecialistId = formInstance.specialistId;
+                    // Update form instance with fresh values from data attributes
+                    formInstance.serviceId = $form.data('service-id') || '';
+                    const locationIdData = $form.data('location-id') || '';
+                    formInstance.locationId = locationIdData ? String(locationIdData) : '';
+                    formInstance.preselectedLocationId = locationIdData ? String(locationIdData) : '';
+                    formInstance.specialistId = $form.data('specialist-id') || '';
+                    formInstance.selectedDate = '';
+                    formInstance.selectedTime = '';
+                    
+                    // Reset form (will recalculate step mapping and go to correct step)
                     formInstance.resetForm();
-                    // Restore serviceId and specialistId after reset
-                    if (currentServiceId) formInstance.serviceId = currentServiceId;
-                    if (currentSpecialistId) formInstance.specialistId = currentSpecialistId;
                 }
                 
-                // If serviceId provided, ensure it's selected and we move to step 2
+                // If serviceId provided, ensure it's selected
                 if (serviceId) {
                     formInstance.serviceId = serviceId;
                     // Update the data attribute
                     $form.attr('data-service-id', serviceId);
                     
-                    // If services are already loaded, select directly and go to step 2
+                    // If locationId also provided, set it
+                    if (locationId) {
+                        formInstance.locationId = String(locationId);
+                        formInstance.preselectedLocationId = String(locationId);
+                        $form.attr('data-location-id', locationId);
+                    }
+                    
+                    // Recalculate step mapping with updated values
+                    formInstance.setupStepMapping();
+                    
+                    // Determine correct initial step
+                    let firstLogicalStep = 1;
+                    if (formInstance.serviceId && formInstance.locationId) {
+                        firstLogicalStep = formInstance.getLogicalStep(3);
+                    } else if (formInstance.serviceId) {
+                        firstLogicalStep = formInstance.getLogicalStep(2);
+                    } else {
+                        firstLogicalStep = formInstance.getLogicalStep(1);
+                    }
+                    
+                    // If services are already loaded, select directly
                     if (formInstance.services && formInstance.services.length > 0) {
                         const serviceExists = formInstance.services.some(s => s.id === serviceId);
                         if (serviceExists) {
                             // Select service visually (without auto-advance)
                             formInstance.selectService(serviceId, false);
-                            // Go directly to step 2 without showing step 1
-                            setTimeout(() => {
-                                formInstance.goToStep(2);
-                            }, 50);
+                            // Go to correct step based on pre-selected values
+                            formInstance.goToLogicalStep(firstLogicalStep);
+                            // Load locations if needed for summary
+                            if (formInstance.locationId && formInstance.serviceId) {
+                                formInstance.loadCategoriesForSummary();
+                            }
                         } else {
                             formInstance.loadServices();
                         }
@@ -1317,7 +1661,7 @@
                     }
                 } else {
                     // No preselected service; reset to step 1
-                    formInstance.goToStep(1);
+                    formInstance.goToLogicalStep(1);
                     // If not initialized before, ensure services load
                     if (!formInstance.services || formInstance.services.length === 0) {
                         formInstance.loadServices();

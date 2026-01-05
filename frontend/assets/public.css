@@ -225,6 +225,7 @@
     gap: 10px;
     justify-content: space-between;
     margin-top: 20px;
+    align-items: flex-end;
 }
 /* Therapist tags */
 .kab-therapist-tag {
@@ -236,6 +237,7 @@
     font-weight: 400;
     display: inline-block;
     margin-right: 5px;
+    margin-bottom: 5px;
 }
 
 /* Les mer link */
@@ -699,6 +701,7 @@
     gap: 15px;
     align-items: center;
     margin-top: 20px;
+    justify-content: space-between;
 }
 
 /* Details step navigation - back button in separate row */
@@ -983,7 +986,7 @@
 .kab-button {
     background-color: #452DAF;
     font-family: "Manrope", Sans-serif !important;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 400;
     fill: #F5F5F7;
     color: #F5F5F7;
@@ -992,12 +995,22 @@
     border-color: #452DAF;
     border-radius: 8px 8px 8px 8px;
     padding: 10px 30px 10px 30px;
+    width: 100%;
 }
 
 .kab-button:hover {
     background-color: #31207C;
     color: #FFFFFF;
     border-color: #31207C;
+}
+
+.kab-selected-service-card{
+    align-items: center;
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-width: 320px;
 }
 
 /* Responsive Styles */
