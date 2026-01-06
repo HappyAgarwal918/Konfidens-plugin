@@ -31,6 +31,11 @@
             this.therapist = null;
             this.allTherapists = []; // Store all therapists for selection step
             
+            // Track pending AJAX requests to prevent race conditions
+            this.pendingServicesRequest = null;
+            this.loadingServicesForTherapistId = null;
+            this.isLoadingServices = false;
+            
             this.init();
         }
         
@@ -61,10 +66,19 @@
         initEvents() {
             const self = this;
             
-            // Service selection
+            // Service selection - only allow if services are loaded
             this.$form.on('click', '.kab-service-item', function() {
+                // Prevent selection while loading
+                if (self.isLoadingServices) {
+                    return;
+                }
+                
                 const serviceId = $(this).data('service-id');
-                self.selectService(serviceId);
+                // Verify service belongs to current therapist
+                const service = self.services.find(s => s.id === serviceId);
+                if (service) {
+                    self.selectService(serviceId);
+                }
             });
             
             // Category selection
@@ -261,21 +275,50 @@
             const self = this;
             const $servicesList = this.$form.find('.kab-services-list');
             
-            // Only show loading if list is empty
-            if ($servicesList.is(':empty') || $servicesList.find('.kab-service-item').length === 0) {
-                $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            // Cancel any pending request
+            if (this.pendingServicesRequest) {
+                this.pendingServicesRequest.abort();
+                this.pendingServicesRequest = null;
             }
             
-            $.ajax({
+            // Store which therapist we're loading services for
+            const loadingForTherapistId = this.therapistId;
+            this.loadingServicesForTherapistId = loadingForTherapistId;
+            this.isLoadingServices = true;
+            
+            // Clear old services immediately and show loading
+            $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
+            // Disable service selection while loading (add visual indicator)
+            $servicesList.addClass('kab-loading-services');
+            
+            // Clear current service selection
+            this.serviceId = '';
+            this.services = [];
+            
+            this.pendingServicesRequest = $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
                 data: {
                     action: 'kab_get_services_for_therapist',
-                    therapist_id: this.therapistId,
+                    therapist_id: loadingForTherapistId,
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
+                    // Only process if this response is for the current therapist
+                    if (self.loadingServicesForTherapistId !== loadingForTherapistId) {
+                        return; // Ignore stale response
+                    }
+                    
+                    // Clear the pending request reference
+                    self.pendingServicesRequest = null;
+                    self.isLoadingServices = false;
+                    self.loadingServicesForTherapistId = null;
+                    
                     if (response.success && response.data.services) {
+                        // Remove loading indicator
+                        self.$form.find('.kab-services-list').removeClass('kab-loading-services');
+                        
                         // Store services data for later use (including prices)
                         self.services = response.data.services;
                         
@@ -372,8 +415,24 @@
                         $servicesList.html('<div class="kab-no-data">' + (response.data?.message || kab_vars.no_services) + '</div>');
                     }
                 },
-                error: function() {
-                    $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                error: function(xhr, status, error) {
+                    // Only process error if this response is for the current therapist
+                    if (self.loadingServicesForTherapistId !== loadingForTherapistId) {
+                        return; // Ignore stale response
+                    }
+                    
+                    // Clear the pending request reference
+                    self.pendingServicesRequest = null;
+                    self.isLoadingServices = false;
+                    self.loadingServicesForTherapistId = null;
+                    
+                    // Remove loading indicator
+                    self.$form.find('.kab-services-list').removeClass('kab-loading-services');
+                    
+                    // Don't show error if request was aborted (user changed therapist)
+                    if (status !== 'abort') {
+                        $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                    }
                 }
             });
         }
@@ -451,20 +510,29 @@
         selectNewTherapist(therapistId) {
             const self = this;
             
+            // Don't do anything if selecting the same therapist
+            if (this.therapistId === therapistId) {
+                return;
+            }
+            
             // Update therapist ID
             this.therapistId = therapistId;
             this.$form.attr('data-therapist-id', therapistId);
             
-            // Reset service selection
+            // Reset service selection immediately
             this.serviceId = '';
             this.locationId = '';
             this.selectedDate = '';
             this.selectedTime = '';
+            this.services = [];
+            
+            // Clear any selected service UI
+            this.$form.find('.kab-service-item').removeClass('selected');
             
             // Reload therapist info
             this.loadTherapist();
             
-            // Reload services for the new therapist
+            // Reload services for the new therapist (will cancel any pending request)
             this.loadServices();
             
             // Go back to step 1
@@ -759,6 +827,17 @@
          * Select a service
          */
         selectService(serviceId, autoAdvance = true) {
+            // Prevent selection while loading services
+            if (this.isLoadingServices) {
+                return;
+            }
+            
+            // Verify service exists in current services array
+            const service = this.services.find(s => s.id === serviceId);
+            if (!service) {
+                return; // Service doesn't belong to current therapist
+            }
+            
             this.serviceId = serviceId;
             
             // Update UI

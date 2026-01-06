@@ -174,6 +174,13 @@
     background-color: #d9d6e5;
 }
 
+/* Disable service selection while loading */
+.kab-services-list.kab-loading-services .kab-service-item {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .kab-service-info p, .kab-category-name {
     font-family: "Manrope", Sans-serif;
     font-size: 18px;
