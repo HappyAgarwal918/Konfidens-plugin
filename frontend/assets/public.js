@@ -1627,8 +1627,8 @@
      * Initialize booking forms when DOM is ready
      */
     $(document).ready(function() {
-        // Initialize booking forms (skip forms in hidden popups, therapist-first forms, and service-therapist-first forms - they'll be initialized when popup opens or by their own script)
-        $('.kab-booking-form').not('.kab-popup .kab-booking-form').not('.kab-therapist-first').not('.kab-service-therapist-first').each(function() {
+        // Initialize booking forms (skip forms in hidden popups and therapist-first forms - they'll be initialized when popup opens or by their own script)
+        $('.kab-booking-form').not('.kab-popup .kab-booking-form').not('.kab-therapist-first').each(function() {
             const $form = $(this);
             const instance = new KABBookingForm($form);
             $form.data('kab-form-instance', instance);
@@ -1652,12 +1652,6 @@
             const $therapistForm = $popup.find('.kab-booking-form.kab-therapist-first');
             if ($therapistForm.length) {
                 return; // Don't process therapist-first forms here
-            }
-            
-            // Skip if this is a service-therapist-first form (handled by public-service-therapist-first.js)
-            const $serviceTherapistForm = $popup.find('.kab-booking-form.kab-service-therapist-first');
-            if ($serviceTherapistForm.length) {
-                return; // Don't process service-therapist-first forms here
             }
             
             // Handle regular booking form

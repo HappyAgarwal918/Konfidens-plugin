@@ -198,11 +198,6 @@ function kab_display_dashboard_page() {
                         <p><?php _e('Creates a button that opens the booking form in a popup with a specific therapist pre-selected. Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details. You can change the therapist. Replace SPECIALIST_ID with the actual therapist ID.', 'konfidens-appointment-booking'); ?></p>
                     </div>
                     
-                    <div class="kab-shortcode-example">
-                        <h4><?php _e('4. Popup Button with Service Pre-selected (Service-Therapist Flow)', 'konfidens-appointment-booking'); ?></h4>
-                        <code>[su_button flow="service-therapist-first" service_id="SERVICE_ID"]Book Appointment[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form in a popup with a specific service pre-selected. Flow: Service (pre-selected) → Therapist (according to service) → Location → Date & Time → Personal Details. You can customize the button text. Replace SERVICE_ID with the actual service ID.', 'konfidens-appointment-booking'); ?></p>
-                    </div>
                 </div>
             </div>
         </div>

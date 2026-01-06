@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.4');
+define('KAB_VERSION', '1.0.5');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -103,9 +103,6 @@ function kab_enqueue_scripts() {
     
     // Enqueue therapist-first form script
     wp_enqueue_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
-    
-    // Enqueue service & therapist first form script
-    wp_enqueue_script('kab-js-service-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-service-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
     
     // Add reCAPTCHA if enabled
     if (get_option('kab_enable_recaptcha', false)) {
@@ -292,7 +289,6 @@ add_action('init', 'kab_register_shortcodes');
  * [su_button service_id="SERVICE_ID"]Book This Service[/su_button] - Service pre-selected: Service → Location → Therapist → Date & Time → Personal Details
  * [su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button] - Service and Location pre-selected: Service → Location (pre-selected) → Therapist → Date & Time → Personal Details
  * [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button] - Therapist pre-selected: Therapist → Services → Location → Date & Time → Personal Details
- * [su_button flow="service-therapist-first" service_id="SERVICE_ID"]Book Appointment[/su_button] - Service pre-selected: Service → Therapist (according to service) → Location → Date & Time → Personal Details
  */
 function kab_button_shortcode($atts, $content = null) {
     $atts = shortcode_atts(
@@ -302,7 +298,6 @@ function kab_button_shortcode($atts, $content = null) {
             'service_id' => '',
             'location_id' => '',
             'id' => '', // specialist_id
-            'flow' => '', // Form flow type: 'service-therapist-first'
         ),
         $atts,
         'su_button'
@@ -354,12 +349,7 @@ function kab_button_shortcode($atts, $content = null) {
             <div class="kab-popup-inner">
                 <?php 
                 // Determine which template to use based on parameters
-                if ($atts['flow'] === 'service-therapist-first' && !empty($atts['service_id'])) {
-                    // Service pre-selected with service-therapist-first flow: Service → Therapist (according to service) → Location → Date & Time → Personal Details
-                    $form_atts = array('context' => 'popup', 'flow' => 'service-therapist-first', 'service_id' => $atts['service_id']);
-                    $atts = $form_atts;
-                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template-service-therapist-first.php';
-                } elseif (!empty($atts['id'])) {
+                if (!empty($atts['id'])) {
                     // Therapist First flow: Therapist is pre-selected → show services according to therapist → Location → Date & Time → Personal Details
                     $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
                     $atts = $therapist_atts;
