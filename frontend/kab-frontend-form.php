@@ -17,17 +17,31 @@ function kab_get_services() {
         wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
     }
     
+    // Try cache first (5 minute cache)
+    $cache_key = 'kab_all_services_with_categories';
+    $cached = get_transient($cache_key);
+    
+    if ($cached !== false) {
+        wp_send_json_success($cached);
+        return;
+    }
+    
     // Get services with priority
     $services = kab_get_services_with_priority();
     
     // Get all categories for grouping
     $categories = kab_get_service_categories();
     
+    $result = array(
+        'services' => $services,
+        'categories' => $categories
+    );
+    
+    // Cache for 5 minutes
+    set_transient($cache_key, $result, 300);
+    
     if (!empty($services)) {
-        wp_send_json_success(array(
-            'services' => $services,
-            'categories' => $categories
-        ));
+        wp_send_json_success($result);
     } else {
         wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
     }
@@ -205,6 +219,7 @@ add_action('wp_ajax_nopriv_kab_get_all_therapists', 'kab_get_all_therapists_ajax
 
 /**
  * AJAX handler for getting services for a specific therapist
+ * Optimized to reduce API calls using caching
  */
 function kab_get_services_for_therapist_ajax() {
     // Check nonce
@@ -219,33 +234,94 @@ function kab_get_services_for_therapist_ajax() {
     
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
     
-    // Get all services with priority
+    // Try to use cache first (5 minute cache)
+    $cache_key = 'kab_therapist_services_' . md5($therapist_id);
+    $cached = get_transient($cache_key);
+    
+    if ($cached !== false) {
+        wp_send_json_success($cached);
+        return;
+    }
+    
+    // Get all services with priority (single API call)
     $all_services = kab_get_services_with_priority();
     
-    // Filter services that belong to this therapist
+    if (empty($all_services)) {
+        wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
+        return;
+    }
+    
+    // Build a reverse map: therapist_id => array of service_ids
+    // This is more efficient than checking each service
+    $therapist_service_map_key = 'kab_therapist_service_map';
+    $therapist_service_map = get_transient($therapist_service_map_key);
+    
+    if ($therapist_service_map === false) {
+        // Build the map from scratch (cache miss)
+        $therapist_service_map = array();
+        
+        // Get therapists for each service, but cache individual service-therapist mappings
+        foreach ($all_services as $service) {
+            $service_id = $service['id'];
+            
+            // Check cache for this service's therapists
+            $therapist_cache_key = 'kab_service_therapists_' . md5($service_id);
+            $cached_therapists = get_transient($therapist_cache_key);
+            
+            if ($cached_therapists === false) {
+                // Get therapists for this service
+                $service_therapists = kab_get_therapists_for_service($service_id);
+                
+                // Cache for 5 minutes
+                set_transient($therapist_cache_key, $service_therapists, 300);
+            } else {
+                $service_therapists = $cached_therapists;
+            }
+            
+            // Build reverse map: therapist_id => service_ids[]
+            foreach ($service_therapists as $therapist) {
+                $tid = $therapist['id'];
+                if (!isset($therapist_service_map[$tid])) {
+                    $therapist_service_map[$tid] = array();
+                }
+                $therapist_service_map[$tid][] = $service_id;
+            }
+        }
+        
+        // Cache the reverse map for 5 minutes
+        set_transient($therapist_service_map_key, $therapist_service_map, 300);
+    }
+    
+    // Get service IDs for this therapist from the reverse map
+    $therapist_service_ids = isset($therapist_service_map[$therapist_id]) ? $therapist_service_map[$therapist_id] : array();
+    
+    // Filter services that belong to this therapist using the reverse map
     $therapist_services = array();
     
-    foreach ($all_services as $service) {
-        // Get therapists for this service
-        $service_therapists = kab_get_therapists_for_service($service['id']);
+    if (!empty($therapist_service_ids)) {
+        // Create a lookup array for faster filtering
+        $therapist_service_ids_lookup = array_flip($therapist_service_ids);
         
-        // Check if this therapist is in the list
-        foreach ($service_therapists as $therapist) {
-            if ($therapist['id'] === $therapist_id) {
+        foreach ($all_services as $service) {
+            if (isset($therapist_service_ids_lookup[$service['id']])) {
                 $therapist_services[] = $service;
-                break;
             }
         }
     }
     
-    // Get all categories for grouping
+    // Get all categories for grouping (single database query)
     $categories = kab_get_service_categories();
     
+    $result = array(
+        'services' => $therapist_services,
+        'categories' => $categories
+    );
+    
+    // Cache the result for 5 minutes
+    set_transient($cache_key, $result, 300);
+    
     if (!empty($therapist_services)) {
-        wp_send_json_success(array(
-            'services' => $therapist_services,
-            'categories' => $categories
-        ));
+        wp_send_json_success($result);
     } else {
         wp_send_json_error(array('message' => __('No services available for this therapist.', 'konfidens-appointment-booking')));
     }
