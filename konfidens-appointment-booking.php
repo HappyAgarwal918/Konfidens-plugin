@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.5');
+define('KAB_VERSION', '1.0.6');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -286,8 +286,6 @@ add_action('init', 'kab_register_shortcodes');
  * Button shortcode
  * 
  * [su_button]Book Now[/su_button] - Full flow: Service → Location → Therapist → Date & Time → Personal Details
- * [su_button service_id="SERVICE_ID"]Book This Service[/su_button] - Service pre-selected: Service → Location → Therapist → Date & Time → Personal Details
- * [su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button] - Service and Location pre-selected: Service → Location (pre-selected) → Therapist → Date & Time → Personal Details
  * [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button] - Therapist pre-selected: Therapist → Services → Location → Date & Time → Personal Details
  */
 function kab_button_shortcode($atts, $content = null) {
@@ -295,8 +293,6 @@ function kab_button_shortcode($atts, $content = null) {
         array(
             'background' => '',
             'class' => '',
-            'service_id' => '',
-            'location_id' => '',
             'id' => '', // specialist_id
         ),
         $atts,
@@ -325,9 +321,6 @@ function kab_button_shortcode($atts, $content = null) {
     
     // Prepare data attributes
     $data_attrs = '';
-    if (!empty($atts['service_id'])) {
-        $data_attrs .= ' data-service-id="' . esc_attr($atts['service_id']) . '"';
-    }
     if (!empty($atts['id'])) {
         $data_attrs .= ' data-specialist-id="' . esc_attr($atts['id']) . '"';
     }
@@ -354,14 +347,6 @@ function kab_button_shortcode($atts, $content = null) {
                     $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
                     $atts = $therapist_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
-                } elseif (!empty($atts['service_id'])) {
-                    // Service pre-selected: Service → Location → Therapist → Date & Time → Personal Details
-                    $form_atts = array('context' => 'popup', 'service_id' => $atts['service_id']);
-                    if (!empty($atts['location_id'])) {
-                        $form_atts['location_id'] = $atts['location_id'];
-                    }
-                    $atts = $form_atts;
-                    include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
                 } else {
                     // Regular form template: Service → Location → Therapist → Date & Time → Personal Details
                     $form_atts = array('context' => 'popup');

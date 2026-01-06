@@ -131,13 +131,7 @@ The plugin communicates with the Konfidens API using the following endpoints:
 1. **`[su_button]Book Now[/su_button]`**: Creates a button that opens the booking form in a popup
    - Flow: Service → Location → Therapist → Date & Time → Personal Details
 
-2. **`[su_button service_id="SERVICE_ID"]Book This Service[/su_button]`**: Creates a button with pre-selected service
-   - Flow: Service (pre-selected) → Location → Therapist → Date & Time → Personal Details
-
-2a. **`[su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button]`**: Creates a button with pre-selected service and location
-   - Flow: Service (pre-selected) → Location (pre-selected) → Therapist → Date & Time → Personal Details
-
-3. **`[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]`**: Creates a button with pre-selected therapist
+2. **`[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]`**: Creates a button with pre-selected therapist
    - Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details
    - Note: Therapist can be changed during the booking process
 
@@ -220,18 +214,6 @@ Add a button that opens the booking form in a popup with full flow:
 
 ```
 [su_button]Book Now[/su_button]
-```
-
-To pre-select a specific service:
-
-```
-[su_button service_id="SERVICE_ID"]Book This Service[/su_button]
-```
-
-To pre-select both service and location:
-
-```
-[su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button]
 ```
 
 To pre-select a specific therapist:

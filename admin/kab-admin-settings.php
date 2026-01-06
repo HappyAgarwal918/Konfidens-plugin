@@ -181,19 +181,7 @@ function kab_display_dashboard_page() {
                     </div>
                     
                     <div class="kab-shortcode-example">
-                        <h4><?php _e('2. Popup Button with Pre-selected Service', 'konfidens-appointment-booking'); ?></h4>
-                        <code>[su_button service_id="SERVICE_ID"]Book This Service[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form in a popup with a specific service pre-selected. Flow: Service (pre-selected) → Location → Therapist → Date & Time → Personal Details. Replace SERVICE_ID with the actual service ID.', 'konfidens-appointment-booking'); ?></p>
-                    </div>
-                    
-                    <div class="kab-shortcode-example">
-                        <h4><?php _e('2a. Popup Button with Pre-selected Service and Location', 'konfidens-appointment-booking'); ?></h4>
-                        <code>[su_button service_id="SERVICE_ID" location_id="LOCATION_ID"]Book This Service[/su_button]</code>
-                        <p><?php _e('Creates a button that opens the booking form in a popup with a specific service and location pre-selected. Flow: Service (pre-selected) → Location (pre-selected) → Therapist → Date & Time → Personal Details. Replace SERVICE_ID and LOCATION_ID with the actual IDs.', 'konfidens-appointment-booking'); ?></p>
-                    </div>
-                    
-                    <div class="kab-shortcode-example">
-                        <h4><?php _e('3. Popup Button with Pre-selected Therapist', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('2. Popup Button with Pre-selected Therapist', 'konfidens-appointment-booking'); ?></h4>
                         <code>[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]</code>
                         <p><?php _e('Creates a button that opens the booking form in a popup with a specific therapist pre-selected. Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details. You can change the therapist. Replace SPECIALIST_ID with the actual therapist ID.', 'konfidens-appointment-booking'); ?></p>
                     </div>
