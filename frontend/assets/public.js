@@ -282,6 +282,31 @@
             const self = this;
             const $servicesList = this.$form.find('.kab-services-list');
             
+            // Read filtered service IDs from data attribute (if Service Set is used)
+            let filteredServiceIds = null;
+            const formElement = this.$form[0];
+            if (formElement) {
+                let serviceIdsAttr = formElement.getAttribute('data-service-ids');
+                if (serviceIdsAttr && serviceIdsAttr !== 'null' && serviceIdsAttr !== '' && serviceIdsAttr !== '[]') {
+                    try {
+                        // Decode HTML entities if present (WordPress esc_attr() encodes quotes)
+                        let decodedAttr = serviceIdsAttr;
+                        if (decodedAttr.includes('&quot;') || decodedAttr.includes('&amp;')) {
+                            const tempDiv = document.createElement('div');
+                            tempDiv.innerHTML = decodedAttr;
+                            decodedAttr = tempDiv.textContent || tempDiv.innerText || decodedAttr;
+                        }
+                        
+                        const parsed = JSON.parse(decodedAttr);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            filteredServiceIds = new Set(parsed.map(id => String(id).trim()).filter(id => id !== ''));
+                        }
+                    } catch (e) {
+                        console.warn('KAB Main Form - Error parsing service IDs:', e);
+                    }
+                }
+            }
+            
             $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
@@ -292,7 +317,17 @@
                 success: function(response) {
                     if (response.success && response.data.services) {
                         // Store services data for later use (including prices)
-                        self.services = response.data.services;
+                        let allServices = response.data.services;
+                        
+                        // Filter services if Service Set is specified
+                        if (filteredServiceIds && filteredServiceIds.size > 0) {
+                            allServices = allServices.filter(service => {
+                                const apiServiceId = String(service.id).trim();
+                                return filteredServiceIds.has(apiServiceId);
+                            });
+                        }
+                        
+                        self.services = allServices;
                         
                         // Group services by category
                         const categories = response.data.categories || [];

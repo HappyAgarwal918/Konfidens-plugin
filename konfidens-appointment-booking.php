@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.6
+ * Version: 1.0.7
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.6');
+define('KAB_VERSION', '1.0.7');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -294,6 +294,7 @@ function kab_button_shortcode($atts, $content = null) {
             'background' => '',
             'class' => '',
             'id' => '', // specialist_id
+            'set' => '', // Service set name (new preferred method)
         ),
         $atts,
         'su_button'
@@ -325,6 +326,18 @@ function kab_button_shortcode($atts, $content = null) {
         $data_attrs .= ' data-specialist-id="' . esc_attr($atts['id']) . '"';
     }
     
+    // Process service set if provided
+    $service_ids = array();
+    if (!empty($atts['set'])) {
+        // Get service set from options
+        $service_sets = get_option('kab_service_sets', array());
+        $set_id = sanitize_text_field($atts['set']);
+        
+        if (isset($service_sets[$set_id]) && !empty($service_sets[$set_id]['service_ids'])) {
+            $service_ids = $service_sets[$set_id]['service_ids'];
+        }
+    }
+    
     // Start output buffering
     ob_start();
     
@@ -349,7 +362,11 @@ function kab_button_shortcode($atts, $content = null) {
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
                 } else {
                     // Regular form template: Service → Location → Therapist → Date & Time → Personal Details
-                    $form_atts = array('context' => 'popup');
+                    $form_atts = array(
+                        'context' => 'popup',
+                        'service_ids' => $service_ids, // Pass filtered service IDs
+                        'popup_id' => $popup_id
+                    );
                     $atts = $form_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
                 }

@@ -11,12 +11,26 @@ if (!defined('ABSPATH')) {
 // Get context
 $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 
+// Get service IDs filter (if provided via Service Set)
+$service_ids = isset($atts['service_ids']) && is_array($atts['service_ids']) ? $atts['service_ids'] : array();
+$service_ids_json = json_encode($service_ids);
+
+// Get popup ID for tracking
+$popup_id = isset($atts['popup_id']) ? $atts['popup_id'] : '';
+
+// Generate unique form ID for tracking
+$form_unique_id = 'kab-form-' . uniqid();
+
 // Form classes
 $form_classes = array('kab-booking-form');
 $form_classes[] = 'kab-context-' . $context;
 ?>
 
-<div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>">
+<div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>"
+     id="<?php echo esc_attr($form_unique_id); ?>"
+     data-form-id="<?php echo esc_attr($form_unique_id); ?>"
+     <?php echo !empty($popup_id) ? ' data-popup-id="' . esc_attr($popup_id) . '"' : ''; ?>
+     data-service-ids="<?php echo esc_attr($service_ids_json); ?>">
     
     <div class="kab-form-progress">
         <div class="kab-progress-text">1/5</div>

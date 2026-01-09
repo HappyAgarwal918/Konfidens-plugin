@@ -295,6 +295,9 @@ function kab_display_services_page() {
                                 </td>
                                 <td>
                                     <input type="number" min="0" name="priority" class="priority-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($priority !== null ? $priority : ''); ?>">
+                                    <div class="save-status" id="priority-save-status-<?php echo esc_attr($service['id']); ?>" style="display: none; margin-top: 5px; color: green; font-style: italic;">
+                                        <?php _e('Saved!', 'konfidens-appointment-booking'); ?>
+                                    </div>
                                 </td>
                                 <td>
                                     <input type="text" name="price" class="price-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($price); ?>" readonly style="background-color: #f0f0f0; cursor: not-allowed;" title="<?php _e('Price is fetched from Konfidens API', 'konfidens-appointment-booking'); ?>">
@@ -359,10 +362,15 @@ function kab_display_services_page() {
                     });
                 });
                 
-                // Priority update
-                $('.priority-select').on('change', function() {
-                    var serviceId = $(this).data('id');
-                    var priority = $(this).val();
+                // Priority update - handle both change and blur events
+                var priorityUpdateHandler = function() {
+                    var $input = $(this);
+                    var serviceId = $input.data('id');
+                    var priority = $input.val();
+                    var saveStatus = $('#priority-save-status-' + serviceId);
+                    
+                    // Show saving indicator
+                    saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
                     
                     $.ajax({
                         url: ajaxurl,
@@ -376,13 +384,37 @@ function kab_display_services_page() {
                         },
                         success: function(response) {
                             if (response.success) {
-                                alert('Priority updated successfully!');
+                                // Show saved message
+                                saveStatus.text('<?php _e("Saved!", "konfidens-appointment-booking"); ?>').css('color', 'green').show();
+                                
+                                // Hide after 2 seconds
+                                setTimeout(function() {
+                                    saveStatus.fadeOut();
+                                }, 2000);
                             } else {
-                                alert('Error updating priority: ' + response.data.message);
+                                // Show error message
+                                saveStatus.text('<?php _e("Error: ", "konfidens-appointment-booking"); ?>' + response.data.message).css('color', 'red').show();
+                                
+                                // Hide after 3 seconds
+                                setTimeout(function() {
+                                    saveStatus.fadeOut();
+                                }, 3000);
                             }
+                        },
+                        error: function() {
+                            // Show error message
+                            saveStatus.text('<?php _e("Error updating priority.", "konfidens-appointment-booking"); ?>').css('color', 'red').show();
+                            
+                            // Hide after 3 seconds
+                            setTimeout(function() {
+                                saveStatus.fadeOut();
+                            }, 3000);
                         }
                     });
-                });
+                };
+                
+                // Handle both change and blur events
+                $('.priority-select').on('change blur', priorityUpdateHandler);
                 
                 // Price field is read-only (fetched from API)
                 // No update handler needed

@@ -53,6 +53,16 @@ function kab_add_admin_menu() {
         'kab_display_settings_page'
     );
     
+    // Service Sets submenu (for alternative form)
+    add_submenu_page(
+        'konfidens',
+        __('Service Sets', 'konfidens-appointment-booking'),
+        __('Service Sets', 'konfidens-appointment-booking'),
+        'manage_options',
+        'konfidens-service-sets',
+        'kab_display_service_sets_page'
+    );
+    
     // Bookings submenu
     add_submenu_page(
         'konfidens',
@@ -478,6 +488,193 @@ function kab_display_settings_page() {
                 <input type="submit" name="kab_save_settings" class="button button-primary" value="<?php _e('Save Settings', 'konfidens-appointment-booking'); ?>" />
             </p>
         </form>
+    </div>
+    <?php
+}
+
+/**
+ * Display Service Sets page
+ */
+function kab_display_service_sets_page() {
+    // Handle form submissions
+    if (isset($_POST['kab_save_service_set']) && check_admin_referer('kab_service_set_nonce', 'kab_service_set_nonce')) {
+        $set_name = sanitize_text_field($_POST['kab_set_name']);
+        $set_id = isset($_POST['kab_set_id']) ? sanitize_text_field($_POST['kab_set_id']) : '';
+        $service_ids = isset($_POST['kab_service_ids']) && is_array($_POST['kab_service_ids']) 
+            ? array_map('sanitize_text_field', $_POST['kab_service_ids']) 
+            : array();
+        
+        if (!empty($set_name)) {
+            $sets = get_option('kab_service_sets', array());
+            
+            if (empty($set_id)) {
+                // Create new set
+                $set_id = 'set_' . time() . '_' . rand(1000, 9999);
+            }
+            
+            $sets[$set_id] = array(
+                'name' => $set_name,
+                'service_ids' => $service_ids,
+                'created' => isset($sets[$set_id]['created']) ? $sets[$set_id]['created'] : current_time('mysql')
+            );
+            
+            update_option('kab_service_sets', $sets);
+            add_settings_error(
+                'kab_service_sets',
+                'kab_service_set_saved',
+                __('Service set saved successfully.', 'konfidens-appointment-booking'),
+                'success'
+            );
+        }
+    }
+    
+    // Handle delete
+    if (isset($_GET['delete_set']) && check_admin_referer('kab_delete_set_' . $_GET['delete_set'])) {
+        $sets = get_option('kab_service_sets', array());
+        $set_id = sanitize_text_field($_GET['delete_set']);
+        if (isset($sets[$set_id])) {
+            unset($sets[$set_id]);
+            update_option('kab_service_sets', $sets);
+            add_settings_error(
+                'kab_service_sets',
+                'kab_service_set_deleted',
+                __('Service set deleted successfully.', 'konfidens-appointment-booking'),
+                'success'
+            );
+        }
+    }
+    
+    // Get all service sets
+    $service_sets = get_option('kab_service_sets', array());
+    
+    // Get services from API
+    $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
+    $all_services = array();
+    if ($services_response['success'] && !empty($services_response['data'])) {
+        $all_services = $services_response['data'];
+    }
+    
+    // Get set to edit
+    $editing_set = null;
+    $editing_set_id = '';
+    if (isset($_GET['edit_set'])) {
+        $editing_set_id = sanitize_text_field($_GET['edit_set']);
+        if (isset($service_sets[$editing_set_id])) {
+            $editing_set = $service_sets[$editing_set_id];
+        }
+    }
+    
+    settings_errors('kab_service_sets');
+    ?>
+    <div class="wrap kab-admin">
+        <h1><?php _e('Service Sets', 'konfidens-appointment-booking'); ?></h1>
+        <p><?php _e('Create service sets to use in your booking buttons. Instead of passing long UUID lists, simply reference a set name in your shortcode.', 'konfidens-appointment-booking'); ?></p>
+        
+        <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04); margin: 20px 0;">
+            <h2><?php echo $editing_set ? __('Edit Service Set', 'konfidens-appointment-booking') : __('Create New Service Set', 'konfidens-appointment-booking'); ?></h2>
+            <form method="post" action="">
+                <?php wp_nonce_field('kab_service_set_nonce', 'kab_service_set_nonce'); ?>
+                <?php if ($editing_set_id): ?>
+                    <input type="hidden" name="kab_set_id" value="<?php echo esc_attr($editing_set_id); ?>" />
+                <?php endif; ?>
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="kab_set_name"><?php _e('Set Name', 'konfidens-appointment-booking'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" name="kab_set_name" id="kab_set_name" class="regular-text" 
+                                value="<?php echo $editing_set ? esc_attr($editing_set['name']) : ''; ?>" 
+                                placeholder="<?php _e('e.g., Set 1, Homepage Services, etc.', 'konfidens-appointment-booking'); ?>" required />
+                            <p class="description"><?php _e('A friendly name for this service set (e.g., "Set 1", "Homepage Services").', 'konfidens-appointment-booking'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label><?php _e('Select Services', 'konfidens-appointment-booking'); ?></label>
+                        </th>
+                        <td>
+                            <?php if (empty($all_services)): ?>
+                                <p class="description" style="color: #d63638;">
+                                    <?php _e('No services available. Please check your API connection in Settings.', 'konfidens-appointment-booking'); ?>
+                                </p>
+                            <?php else: ?>
+                                <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                                    <?php 
+                                    $selected_ids = $editing_set ? $editing_set['service_ids'] : array();
+                                    foreach ($all_services as $service): 
+                                        $service_id = isset($service['id']) ? $service['id'] : '';
+                                        $service_name = isset($service['name']) ? $service['name'] : __('Unnamed Service', 'konfidens-appointment-booking');
+                                        $is_selected = in_array($service_id, $selected_ids);
+                                    ?>
+                                        <label style="display: block; padding: 5px; margin: 2px 0; cursor: pointer; <?php echo $is_selected ? 'background: #e7f5e7;' : ''; ?>">
+                                            <input type="checkbox" name="kab_service_ids[]" value="<?php echo esc_attr($service_id); ?>" 
+                                                <?php checked($is_selected); ?> />
+                                            <strong><?php echo esc_html($service_name); ?></strong>
+                                            <span style="color: #666; font-size: 11px; margin-left: 10px;">(<?php echo esc_html($service_id); ?>)</span>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <p class="description"><?php _e('Select the services that should be available in this set.', 'konfidens-appointment-booking'); ?></p>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <input type="submit" name="kab_save_service_set" class="button button-primary" 
+                        value="<?php echo $editing_set ? __('Update Set', 'konfidens-appointment-booking') : __('Create Set', 'konfidens-appointment-booking'); ?>" />
+                    <?php if ($editing_set_id): ?>
+                        <a href="<?php echo admin_url('admin.php?page=konfidens-service-sets'); ?>" class="button">
+                            <?php _e('Cancel', 'konfidens-appointment-booking'); ?>
+                        </a>
+                    <?php endif; ?>
+                </p>
+            </form>
+        </div>
+        
+        <div style="background: #fff; padding: 20px; border: 1px solid #ccd0d4; box-shadow: 0 1px 1px rgba(0,0,0,.04); margin: 20px 0;">
+            <h2><?php _e('Existing Service Sets', 'konfidens-appointment-booking'); ?></h2>
+            <?php if (empty($service_sets)): ?>
+                <p><?php _e('No service sets created yet.', 'konfidens-appointment-booking'); ?></p>
+            <?php else: ?>
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><?php _e('Set Name', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Services Count', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Shortcode', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Actions', 'konfidens-appointment-booking'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($service_sets as $set_id => $set): ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($set['name']); ?></strong></td>
+                                <td><?php echo count($set['service_ids']); ?> <?php _e('services', 'konfidens-appointment-booking'); ?></td>
+                                <td>
+                                    <code style="background: #f0f0f0; padding: 5px 10px; border-radius: 3px; display: block; margin-bottom: 5px;">
+                                        [su_button set="<?php echo esc_attr($set_id); ?>"]<?php _e('Book Appointment', 'konfidens-appointment-booking'); ?>[/su_button]
+                                    </code>
+                                    <small style="color: #666;"><?php _e('Main Form', 'konfidens-appointment-booking'); ?></small>
+                                </td>
+                                <td>
+                                    <a href="<?php echo admin_url('admin.php?page=konfidens-service-sets&edit_set=' . esc_attr($set_id)); ?>" class="button button-small">
+                                        <?php _e('Edit', 'konfidens-appointment-booking'); ?>
+                                    </a>
+                                    <a href="<?php echo wp_nonce_url(admin_url('admin.php?page=konfidens-service-sets&delete_set=' . esc_attr($set_id)), 'kab_delete_set_' . esc_attr($set_id)); ?>" 
+                                       class="button button-small" 
+                                       onclick="return confirm('<?php _e('Are you sure you want to delete this service set?', 'konfidens-appointment-booking'); ?>');">
+                                        <?php _e('Delete', 'konfidens-appointment-booking'); ?>
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
+        </div>
     </div>
     <?php
 }
