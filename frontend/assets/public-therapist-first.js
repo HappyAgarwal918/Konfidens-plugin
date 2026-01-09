@@ -562,17 +562,89 @@
                         // Store locations data
                         self.locations = response.data.locations;
                         
-                        let html = '';
+                        // Group locations by category
+                        const categories = response.data.categories || [];
+                        const locationsByCategory = {};
+                        const uncategorizedLocations = [];
                         
-                        $.each(response.data.locations, function(index, location) {
-                            html += `
-                                <div class="kab-category-item" data-location-id="${location.id}">
-                                    <p class="kab-category-name">${location.location_name}</p>
-                                </div>
-                            `;
+                        // Initialize categories
+                        categories.forEach(cat => {
+                            locationsByCategory[cat.id] = {
+                                category: cat,
+                                locations: []
+                            };
                         });
                         
+                        // Group locations
+                        self.locations.forEach(location => {
+                            if (location.category_id && locationsByCategory[location.category_id]) {
+                                locationsByCategory[location.category_id].locations.push(location);
+                            } else {
+                                uncategorizedLocations.push(location);
+                            }
+                        });
+                        
+                        // Build HTML with category dropdowns
+                        let html = '';
+                        
+                        // Check if we have any categorized locations
+                        const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
+                        
+                        if (hasCategorizedLocations) {
+                            // Render categorized locations in dropdown groups
+                            Object.values(locationsByCategory).forEach(catData => {
+                                if (catData.locations.length > 0) {
+                                    html += `<div class="kab-category-group">
+                                        <div class="kab-category-header" data-category-id="${catData.category.id}">
+                                            <span class="kab-category-name">${catData.category.category_name}</span>
+                                            <span class="kab-category-toggle">+</span>
+                                        </div>
+                                        <div class="kab-category-services" style="display: none;">
+                                            ${catData.locations.map(location => 
+                                                `<div class="kab-category-item" data-location-id="${location.id}">
+                                                    <p class="kab-category-name">${location.location_name}</p>
+                                                </div>`
+                                            ).join('')}
+                                        </div>
+                                    </div>`;
+                                }
+                            });
+                            
+                            // Add uncategorized locations directly (without category grouping)
+                            if (uncategorizedLocations.length > 0) {
+                                html += uncategorizedLocations.map(location => 
+                                    `<div class="kab-category-item" data-location-id="${location.id}">
+                                        <p class="kab-category-name">${location.location_name}</p>
+                                    </div>`
+                                ).join('');
+                            }
+                        } else {
+                            // No categories, render all locations directly like before
+                            html = self.locations.map(location => 
+                                `<div class="kab-category-item" data-location-id="${location.id}">
+                                    <p class="kab-category-name">${location.location_name}</p>
+                                </div>`
+                            ).join('');
+                        }
+                        
                         $categoriesList.html(html);
+                        
+                        // Initialize category toggle functionality (only if categories exist)
+                        if (hasCategorizedLocations) {
+                            $categoriesList.find('.kab-category-header').on('click', function() {
+                                const $header = $(this);
+                                const $locations = $header.next('.kab-category-services');
+                                const $toggle = $header.find('.kab-category-toggle');
+                                
+                                // Close all other categories
+                                $categoriesList.find('.kab-category-services').not($locations).slideUp(200);
+                                $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
+                                
+                                // Toggle current category
+                                $locations.slideToggle(200);
+                                $toggle.text($locations.is(':visible') ? '−' : '+');
+                            });
+                        }
                     } else {
                         $categoriesList.html('<div class="kab-no-data">' + (response.data?.message || 'No locations available for this therapist and service combination.') + '</div>');
                     }

@@ -28,6 +28,7 @@ require_once KAB_PLUGIN_DIR . 'kab-activator.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-settings.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-service.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-specialist.php';
+require_once KAB_PLUGIN_DIR . 'admin/kab-admin-location.php';
 require_once KAB_PLUGIN_DIR . 'frontend/kab-frontend-form.php';
 require_once KAB_PLUGIN_DIR . 'frontend/kab-email.php';
 

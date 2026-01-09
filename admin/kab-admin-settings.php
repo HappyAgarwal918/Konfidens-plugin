@@ -43,6 +43,16 @@ function kab_add_admin_menu() {
         'kab_display_therapists_page'
     );
     
+    // Locations submenu
+    add_submenu_page(
+        'konfidens',
+        __('Locations', 'konfidens-appointment-booking'),
+        __('Locations', 'konfidens-appointment-booking'),
+        'manage_options',
+        'konfidens-locations',
+        'kab_display_locations_page'
+    );
+    
     // Settings submenu
     add_submenu_page(
         'konfidens',

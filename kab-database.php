@@ -20,6 +20,23 @@ function kab_create_tables() {
     $wpdb->query("CREATE TABLE IF NOT EXISTS $location_table (
         id int(11) NOT NULL AUTO_INCREMENT,
         location_name varchar(255) NOT NULL,
+        category_id int(11) DEFAULT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+    ) $charset_collate;");
+    
+    // Add category_id column if it doesn't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_table LIKE 'category_id'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $location_table ADD COLUMN category_id int(11) DEFAULT NULL AFTER location_name");
+    }
+    
+    // Create location category table
+    $location_category_table = $wpdb->prefix . 'kab_location_category';
+    $wpdb->query("CREATE TABLE IF NOT EXISTS $location_category_table (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        category_name varchar(255) NOT NULL,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
@@ -131,14 +148,16 @@ function kab_get_location_by_id($id) {
 /**
  * Add a new location
  */
-function kab_add_location($location_name) {
+function kab_add_location($location_name, $category_id = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
     
-    $result = $wpdb->insert(
-        $table_name,
-        array('location_name' => sanitize_text_field($location_name))
-    );
+    $data = array('location_name' => sanitize_text_field($location_name));
+    if ($category_id !== null && $category_id !== '') {
+        $data['category_id'] = intval($category_id);
+    }
+    
+    $result = $wpdb->insert($table_name, $data);
     
     return $result ? $wpdb->insert_id : false;
 }
@@ -146,15 +165,106 @@ function kab_add_location($location_name) {
 /**
  * Update a location
  */
-function kab_update_location($id, $location_name) {
+function kab_update_location($id, $location_name, $category_id = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
     
+    $data = array('location_name' => sanitize_text_field($location_name));
+    if ($category_id !== null && $category_id !== '') {
+        $data['category_id'] = intval($category_id);
+    } else {
+        $data['category_id'] = null;
+    }
+    
     return $wpdb->update(
         $table_name,
-        array('location_name' => sanitize_text_field($location_name)),
+        $data,
         array('id' => $id)
     );
+}
+
+/**
+ * Get location category ID
+ */
+function kab_get_location_category_id($location_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location';
+    
+    $location = $wpdb->get_row($wpdb->prepare("SELECT category_id FROM $table_name WHERE id = %d", $location_id));
+    
+    if ($location && $location->category_id !== null && $location->category_id !== '') {
+        return intval($location->category_id);
+    }
+    
+    return null;
+}
+
+/**
+ * Get all location categories
+ */
+function kab_get_location_categories() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_category';
+    
+    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY category_name ASC");
+}
+
+/**
+ * Get location category by ID
+ */
+function kab_get_location_category_by_id($id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_category';
+    
+    return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $id));
+}
+
+/**
+ * Add a new location category
+ */
+function kab_add_location_category($category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_category';
+    
+    $result = $wpdb->insert(
+        $table_name,
+        array('category_name' => sanitize_text_field($category_name))
+    );
+    
+    return $result ? $wpdb->insert_id : false;
+}
+
+/**
+ * Update a location category
+ */
+function kab_update_location_category($id, $category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_category';
+    
+    return $wpdb->update(
+        $table_name,
+        array('category_name' => sanitize_text_field($category_name)),
+        array('id' => $id)
+    );
+}
+
+/**
+ * Delete a location category
+ */
+function kab_delete_location_category($id) {
+    global $wpdb;
+    $location_category_table = $wpdb->prefix . 'kab_location_category';
+    $location_table = $wpdb->prefix . 'kab_location';
+    
+    // First, remove category from all locations
+    $wpdb->update(
+        $location_table,
+        array('category_id' => null),
+        array('category_id' => $id)
+    );
+    
+    // Then delete the category
+    return $wpdb->delete($location_category_table, array('id' => $id));
 }
 
 /**

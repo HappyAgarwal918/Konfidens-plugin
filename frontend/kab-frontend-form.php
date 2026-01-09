@@ -80,7 +80,18 @@ function kab_get_locations_ajax() {
         }
         
         if (!empty($locations)) {
-            wp_send_json_success(array('locations' => $locations));
+            // Get all location categories for grouping
+            $categories = kab_get_location_categories();
+            
+            // Add category_id to each location
+            foreach ($locations as &$location) {
+                $location->category_id = kab_get_location_category_id($location->id);
+            }
+            
+            wp_send_json_success(array(
+                'locations' => $locations,
+                'categories' => $categories
+            ));
         } else {
             wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
         }
@@ -368,7 +379,18 @@ function kab_get_locations_for_therapist_service_ajax() {
         }
         
         if (!empty($locations)) {
-            wp_send_json_success(array('locations' => $locations));
+            // Get all location categories for grouping
+            $categories = kab_get_location_categories();
+            
+            // Add category_id to each location
+            foreach ($locations as &$location) {
+                $location->category_id = kab_get_location_category_id($location->id);
+            }
+            
+            wp_send_json_success(array(
+                'locations' => $locations,
+                'categories' => $categories
+            ));
         } else {
             wp_send_json_error(array('message' => __('No locations available for this therapist and service combination.', 'konfidens-appointment-booking')));
         }
