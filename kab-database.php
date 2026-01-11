@@ -447,7 +447,7 @@ function kab_get_service_price($service_id) {
     }
     
     // No price found in API response
-    return '';
+    return '0';
 }
 
 /**

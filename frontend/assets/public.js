@@ -1478,15 +1478,17 @@
             }
             
             // Get price from stored service data
-            let price = '';
+            let price = '0';
             if (this.serviceId && this.services.length > 0) {
                 const selectedService = this.services.find(service => service.id === this.serviceId);
                 if (selectedService && selectedService.price) {
                     // Format price (add comma and dash if needed)
-                    price = selectedService.price;
-                    if (price && !price.includes(',')) {
+                    price = selectedService.price || '0';
+                    if (price && price !== '0' && !price.includes(',')) {
                         price = price + ',-';
                     }
+                } else if (selectedService) {
+                    price = selectedService.price || '0';
                 }
             }
             

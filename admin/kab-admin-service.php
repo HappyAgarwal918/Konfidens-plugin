@@ -238,6 +238,11 @@ function kab_display_services_page() {
                                 $price = kab_get_service_price($service['id']);
                             }
                             
+                            // If still empty, default to 0
+                            if (empty($price)) {
+                                $price = '0';
+                            }
+                            
                             // Ensure price is always a string
                             $price = (string) $price;
                             
@@ -573,6 +578,11 @@ function kab_get_services_with_priority() {
             // If not found in service object, try the function
             if (empty($service['price'])) {
                 $service['price'] = kab_get_service_price($service['id']);
+            }
+            
+            // If still empty, default to 0
+            if (empty($service['price'])) {
+                $service['price'] = '0';
             }
             
             // Ensure price is always a string
