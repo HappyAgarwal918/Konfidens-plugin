@@ -26,7 +26,7 @@ function kab_get_services() {
         return;
     }
     
-    // Get services with priority
+    // Get all services
     $services = kab_get_services_with_priority();
     
     // Get all categories for grouping
@@ -254,7 +254,7 @@ function kab_get_services_for_therapist_ajax() {
         return;
     }
     
-    // Get all services with priority (single API call)
+    // Get all services (single API call)
     $all_services = kab_get_services_with_priority();
     
     if (empty($all_services)) {

@@ -159,7 +159,6 @@ function kab_display_services_page() {
                             <th><?php _e('Total Bookings', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Locations', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Category', 'konfidens-appointment-booking'); ?></th>
-                            <th><?php _e('Priority', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Service Price (from API)', 'konfidens-appointment-booking'); ?></th>
                         </tr>
                     </thead>
@@ -172,8 +171,7 @@ function kab_display_services_page() {
                         $booking_counts = $wpdb->get_results("SELECT service_ids, COUNT(*) as total FROM $table_name_count GROUP BY service_ids", OBJECT_K);
                         
                         foreach ($services as $service): 
-                            // Get service priority, locations, and category
-                            $priority = kab_get_service_priority($service['id']);
+                            // Get service locations and category
                             $service_locations = kab_get_service_locations($service['id']);
                             $service_category_id = kab_get_service_category_id($service['id']);
                             // Get price from API only
@@ -294,12 +292,6 @@ function kab_display_services_page() {
                                     </div>
                                 </td>
                                 <td>
-                                    <input type="number" min="0" name="priority" class="priority-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($priority !== null ? $priority : ''); ?>">
-                                    <div class="save-status" id="priority-save-status-<?php echo esc_attr($service['id']); ?>" style="display: none; margin-top: 5px; color: green; font-style: italic;">
-                                        <?php _e('Saved!', 'konfidens-appointment-booking'); ?>
-                                    </div>
-                                </td>
-                                <td>
                                     <input type="text" name="price" class="price-select" data-id="<?php echo esc_attr($service['id']); ?>" value="<?php echo esc_attr($price); ?>" readonly style="background-color: #f0f0f0; cursor: not-allowed;" title="<?php _e('Price is fetched from Konfidens API', 'konfidens-appointment-booking'); ?>">
                                     <small style="display: block; color: #666; margin-top: 5px; font-style: italic;"><?php _e('Price from API', 'konfidens-appointment-booking'); ?></small>
                                 </td>
@@ -361,60 +353,6 @@ function kab_display_services_page() {
                         }
                     });
                 });
-                
-                // Priority update - handle both change and blur events
-                var priorityUpdateHandler = function() {
-                    var $input = $(this);
-                    var serviceId = $input.data('id');
-                    var priority = $input.val();
-                    var saveStatus = $('#priority-save-status-' + serviceId);
-                    
-                    // Show saving indicator
-                    saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
-                    
-                    $.ajax({
-                        url: ajaxurl,
-                        type: 'POST',
-                        data: {
-                            action: 'kab_update_service_priority',
-                            service_id: serviceId,
-                            priority: priority,
-                            location_ids: '', // Not used but required by the function
-                            nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
-                        },
-                        success: function(response) {
-                            if (response.success) {
-                                // Show saved message
-                                saveStatus.text('<?php _e("Saved!", "konfidens-appointment-booking"); ?>').css('color', 'green').show();
-                                
-                                // Hide after 2 seconds
-                                setTimeout(function() {
-                                    saveStatus.fadeOut();
-                                }, 2000);
-                            } else {
-                                // Show error message
-                                saveStatus.text('<?php _e("Error: ", "konfidens-appointment-booking"); ?>' + response.data.message).css('color', 'red').show();
-                                
-                                // Hide after 3 seconds
-                                setTimeout(function() {
-                                    saveStatus.fadeOut();
-                                }, 3000);
-                            }
-                        },
-                        error: function() {
-                            // Show error message
-                            saveStatus.text('<?php _e("Error updating priority.", "konfidens-appointment-booking"); ?>').css('color', 'red').show();
-                            
-                            // Hide after 3 seconds
-                            setTimeout(function() {
-                                saveStatus.fadeOut();
-                            }, 3000);
-                        }
-                    });
-                };
-                
-                // Handle both change and blur events
-                $('.priority-select').on('change blur', priorityUpdateHandler);
                 
                 // Price field is read-only (fetched from API)
                 // No update handler needed
@@ -565,173 +503,104 @@ function kab_get_service_by_id($service_id) {
 }
 
 /**
- * Get services with priority
+ * Get all services
  */
 function kab_get_services_with_priority() {
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     $services = array();
     
     if ($services_response['success'] && !empty($services_response['data'])) {
-        // Only include services with priority set
-        $prioritized_services = array();
-        
         foreach ($services_response['data'] as $service) {
-            $priority = kab_get_service_priority($service['id']);
+            // Get price from API only (prices are fetched from Konfidens API, not stored in database)
+            // Helper function to safely extract price (handles arrays and objects)
+            // Also converts from cents to main currency unit if needed
+            $extract_price = function($value) {
+                $raw_price = '';
+                
+                if (is_array($value)) {
+                    // If it's an array, try to get the first numeric value
+                    foreach ($value as $item) {
+                        if (is_numeric($item)) {
+                            $raw_price = (string) $item;
+                            break;
+                        }
+                    }
+                    // If no numeric value found, return first item as string
+                    if (empty($raw_price)) {
+                        $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
+                    }
+                } elseif (is_object($value)) {
+                    // If it's an object, try to get a value property
+                    if (isset($value->value)) {
+                        $raw_price = (string) $value->value;
+                    } elseif (isset($value->amount)) {
+                        $raw_price = (string) $value->amount;
+                    } elseif (isset($value->price)) {
+                        $raw_price = (string) $value->price;
+                    }
+                } else {
+                    $raw_price = (string) $value;
+                }
+                
+                // Convert from cents to main currency if the price seems to be in cents
+                // If price is a number and >= 1000, assume it might be in cents
+                if (!empty($raw_price) && is_numeric($raw_price)) {
+                    $numeric_price = floatval($raw_price);
+                    // If price is >= 1000 and is a whole number, likely in cents
+                    // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
+                    if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
+                        $numeric_price = $numeric_price / 100;
+                        // Format to 2 decimal places, remove trailing zeros
+                        $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
+                        return (string) $numeric_price;
+                    }
+                }
+                
+                return $raw_price;
+            };
             
-            // Only include services that have a priority set (not null)
-            if ($priority !== null) {
-                $service['priority'] = $priority;
-                
-                // Get price from API only (prices are fetched from Konfidens API, not stored in database)
-                // Helper function to safely extract price (handles arrays and objects)
-                // Also converts from cents to main currency unit if needed
-                $extract_price = function($value) {
-                    $raw_price = '';
-                    
-                    if (is_array($value)) {
-                        // If it's an array, try to get the first numeric value
-                        foreach ($value as $item) {
-                            if (is_numeric($item)) {
-                                $raw_price = (string) $item;
-                                break;
-                            }
-                        }
-                        // If no numeric value found, return first item as string
-                        if (empty($raw_price)) {
-                            $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
-                        }
-                    } elseif (is_object($value)) {
-                        // If it's an object, try to get a value property
-                        if (isset($value->value)) {
-                            $raw_price = (string) $value->value;
-                        } elseif (isset($value->amount)) {
-                            $raw_price = (string) $value->amount;
-                        } elseif (isset($value->price)) {
-                            $raw_price = (string) $value->price;
-                        }
-                    } else {
-                        $raw_price = (string) $value;
-                    }
-                    
-                    // Convert from cents to main currency if the price seems to be in cents
-                    // If price is a number and >= 1000, assume it might be in cents
-                    if (!empty($raw_price) && is_numeric($raw_price)) {
-                        $numeric_price = floatval($raw_price);
-                        // If price is >= 1000 and is a whole number, likely in cents
-                        // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
-                        if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
-                            $numeric_price = $numeric_price / 100;
-                            // Format to 2 decimal places, remove trailing zeros
-                            $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
-                            return (string) $numeric_price;
-                        }
-                    }
-                    
-                    return $raw_price;
-                };
-                
-                // Get price from API - check common field names
-                $price_fields = array('price', 'Price', 'amount', 'Amount');
-                $service['price'] = '';
-                
-                foreach ($price_fields as $field) {
-                    if (isset($service[$field])) {
-                        $service['price'] = $extract_price($service[$field]);
-                        if (!empty($service['price'])) break;
-                    }
+            // Get price from API - check common field names
+            $price_fields = array('price', 'Price', 'amount', 'Amount');
+            $service['price'] = '';
+            
+            foreach ($price_fields as $field) {
+                if (isset($service[$field])) {
+                    $service['price'] = $extract_price($service[$field]);
+                    if (!empty($service['price'])) break;
                 }
-                
-                // If not found in service object, try the function
-                if (empty($service['price'])) {
-                    $service['price'] = kab_get_service_price($service['id']);
-                }
-                
-                // Ensure price is always a string
-                $service['price'] = (string) $service['price'];
-                
-                // Get category information
-                $category_id = kab_get_service_category_id($service['id']);
-                if ($category_id !== null) {
-                    $category = kab_get_service_category_by_id($category_id);
-                    if ($category) {
-                        $service['category_id'] = $category_id;
-                        $service['category_name'] = $category->category_name;
-                    } else {
-                        $service['category_id'] = null;
-                        $service['category_name'] = null;
-                    }
+            }
+            
+            // If not found in service object, try the function
+            if (empty($service['price'])) {
+                $service['price'] = kab_get_service_price($service['id']);
+            }
+            
+            // Ensure price is always a string
+            $service['price'] = (string) $service['price'];
+            
+            // Get category information
+            $category_id = kab_get_service_category_id($service['id']);
+            if ($category_id !== null) {
+                $category = kab_get_service_category_by_id($category_id);
+                if ($category) {
+                    $service['category_id'] = $category_id;
+                    $service['category_name'] = $category->category_name;
                 } else {
                     $service['category_id'] = null;
                     $service['category_name'] = null;
                 }
-                
-                $prioritized_services[] = $service;
+            } else {
+                $service['category_id'] = null;
+                $service['category_name'] = null;
             }
+            
+            $services[] = $service;
         }
-        
-        // Sort prioritized services by priority (highest first)
-        usort($prioritized_services, function($a, $b) {
-            return $b['priority'] - $a['priority'];
-        });
-        
-        $services = $prioritized_services;
     }
     
     return $services;
 }
 
-/**
- * AJAX handler for updating service priority
- */
-function kab_update_service_priority() {
-    // Check nonce
-    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
-    }
-    
-    // Check permissions
-    if (!current_user_can('manage_options')) {
-        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
-    }
-    
-    // Check required fields
-    if (!isset($_POST['service_id'])) {
-        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
-    }
-    
-    $service_id = sanitize_text_field($_POST['service_id']);
-    $priority_input = isset($_POST['priority']) ? $_POST['priority'] : '';
-    // Convert to integer if set, otherwise null (allow clearing priority)
-    // Allow 0 as a valid priority value
-    $priority = ($priority_input !== '' && $priority_input !== null) ? intval($priority_input) : null;
-    
-    // Get existing locations and category to preserve them
-    $existing_locations = kab_get_service_locations($service_id);
-    $location_ids = isset($_POST['location_ids']) && $_POST['location_ids'] !== '' 
-        ? sanitize_text_field($_POST['location_ids']) 
-        : (!empty($existing_locations) ? implode(',', $existing_locations) : '');
-    $category_id = kab_get_service_category_id($service_id);
-    
-    // Ensure service entry exists (create if it doesn't)
-    $existing_locations_check = kab_get_service_locations($service_id);
-    if (empty($existing_locations_check) && $location_ids === '') {
-        // Service entry doesn't exist, create it first with empty location_ids
-        kab_add_update_service_location($service_id, '', null, $category_id);
-        // Re-fetch locations after creation
-        $existing_locations = kab_get_service_locations($service_id);
-        $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
-    }
-    
-    // Update service priority
-    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
-    
-    if ($result !== false) {
-        wp_send_json_success(array('message' => __('Service priority updated successfully.', 'konfidens-appointment-booking')));
-    } else {
-        wp_send_json_error(array('message' => __('Failed to update service priority.', 'konfidens-appointment-booking')));
-    }
-}
-add_action('wp_ajax_kab_update_service_priority', 'kab_update_service_priority');
 
 /**
  * AJAX handler for updating service locations
@@ -755,12 +624,11 @@ function kab_update_service_locations() {
     $service_id = sanitize_text_field($_POST['service_id']);
     $location_ids = sanitize_text_field($_POST['location_ids']);
     
-    // Get current priority and category
-    $priority = kab_get_service_priority($service_id);
+    // Get current category
     $category_id = kab_get_service_category_id($service_id);
     
     // Update service locations
-    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
+    $result = kab_add_update_service_location($service_id, $location_ids, $category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service locations updated successfully.', 'konfidens-appointment-booking')));
@@ -794,23 +662,22 @@ function kab_update_service_category_ajax() {
     // Convert to integer if set, otherwise null (allow clearing category)
     $category_id = ($category_id_input !== '' && $category_id_input !== null) ? intval($category_id_input) : null;
     
-    // Get existing locations and priority to preserve them
+    // Get existing locations to preserve them
     $existing_locations = kab_get_service_locations($service_id);
     $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
-    $priority = kab_get_service_priority($service_id);
     
     // Ensure service entry exists (create if it doesn't)
     $existing_locations_check = kab_get_service_locations($service_id);
     if (empty($existing_locations_check) && $location_ids === '') {
         // Service entry doesn't exist, create it first with empty location_ids
-        kab_add_update_service_location($service_id, '', null, $category_id);
+        kab_add_update_service_location($service_id, '', $category_id);
         // Re-fetch locations after creation
         $existing_locations = kab_get_service_locations($service_id);
         $location_ids = !empty($existing_locations) ? implode(',', $existing_locations) : '';
     }
     
     // Update service category
-    $result = kab_add_update_service_location($service_id, $location_ids, $priority, $category_id);
+    $result = kab_add_update_service_location($service_id, $location_ids, $category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service category updated successfully.', 'konfidens-appointment-booking')));

@@ -29,12 +29,10 @@
             $('.kab-edit-service').click(function() {
                 var serviceId = $(this).data('service-id');
                 var serviceName = $(this).data('service-name');
-                var priority = $(this).data('priority');
                 var locations = $(this).data('locations').toString();
                 
                 $('#service_id').val(serviceId);
                 $('#service_name').val(serviceName);
-                $('#priority').val(priority);
                 
                 // Set selected locations
                 if (locations) {
@@ -52,13 +50,11 @@
                 e.preventDefault();
                 
                 var serviceId = $('#service_id').val();
-                var priority = $('#priority').val();
                 var locationIds = $('#location_ids').val();
                 
                 var data = {
-                    'action': 'kab_update_service_priority',
+                    'action': 'kab_update_service_locations',
                     'service_id': serviceId,
-                    'priority': priority,
                     'location_ids': locationIds ? locationIds.join(',') : '',
                     'nonce': kab_admin_vars.nonce
                 };

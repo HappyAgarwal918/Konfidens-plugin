@@ -37,7 +37,7 @@ The plugin creates several custom database tables upon activation:
    - `id`: Auto-increment ID
    - `service_id`: Konfidens service ID
    - `location_ids`: Location IDs
-   - `priority`: Display priority for services
+   - `category_id`: Service category ID
    - `created_at`/`updated_at`: Timestamps
 
 3. **`{prefix}_kab_setting`**: Stores API configuration and settings
@@ -92,8 +92,8 @@ The plugin communicates with the Konfidens API using the following endpoints:
 
 1. **Service Selection**:
    - The plugin fetches all available services from the Konfidens API
-   - Service are displayed in the backend services menu inside Konfidens
-   - Services are displayed in the booking form if priority is set
+   - Services are displayed in the backend services menu inside Konfidens
+   - Services are displayed in the booking form
 
 2. **Location Selection**: Show all location based on selected service
 
@@ -166,7 +166,7 @@ The plugin provides several admin pages for configuration:
 
 1. **Konfidens**: Main menu item
 Sub menu -
-2. **Services**: Show all service information (service_id, service_name, service_duration, service_price, priority_selection, total_booking)
+2. **Services**: Show all service information (service_id, service_name, service_duration, service_price, total_booking)
 3. **Categories**: Manages category information (add category, remove category)
 4. **Mapping Categories with Therapist**: Maps categories to therapists (add, remove, update). Multiple categories can be mapped to a single therapist.
 5. **Therapist**: Show all therapists with their specialist id
