@@ -560,8 +560,50 @@ function kab_display_service_sets_page() {
     // Get services from API
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     $all_services = array();
+    $enabled_service_ids = array(); // Track enabled service IDs for validation
     if ($services_response['success'] && !empty($services_response['data'])) {
-        $all_services = $services_response['data'];
+        // Filter only enabled services (same as old plugin)
+        $all_services = array_filter($services_response['data'], function ($service) {
+            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+        });
+        // Re-index array after filtering
+        $all_services = array_values($all_services);
+        
+        // Create array of enabled service IDs for quick lookup
+        foreach ($all_services as $service) {
+            if (isset($service['id'])) {
+                $enabled_service_ids[] = $service['id'];
+            }
+        }
+    }
+    
+    // Clean up service sets: remove disabled services and update if needed
+    $sets_updated = false;
+    foreach ($service_sets as $set_id => &$set) {
+        if (!empty($set['service_ids']) && is_array($set['service_ids'])) {
+            $original_count = count($set['service_ids']);
+            // Filter out disabled services
+            $set['service_ids'] = array_filter($set['service_ids'], function($service_id) use ($enabled_service_ids) {
+                return in_array($service_id, $enabled_service_ids);
+            });
+            $set['service_ids'] = array_values($set['service_ids']); // Re-index
+            
+            if (count($set['service_ids']) < $original_count) {
+                $sets_updated = true;
+            }
+        }
+    }
+    unset($set); // Unset reference
+    
+    // Save cleaned up sets if any were modified
+    if ($sets_updated) {
+        update_option('kab_service_sets', $service_sets);
+        add_settings_error(
+            'kab_service_sets',
+            'kab_service_set_cleaned',
+            __('Service sets have been automatically cleaned: disabled services have been removed.', 'konfidens-appointment-booking'),
+            'info'
+        );
     }
     
     // Get set to edit
@@ -659,10 +701,30 @@ function kab_display_service_sets_page() {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($service_sets as $set_id => $set): ?>
+                        <?php foreach ($service_sets as $set_id => $set): 
+                            $set_service_ids = isset($set['service_ids']) && is_array($set['service_ids']) ? $set['service_ids'] : array();
+                            $enabled_count = 0;
+                            $disabled_count = 0;
+                            
+                            // Count enabled vs disabled services in this set
+                            foreach ($set_service_ids as $service_id) {
+                                if (in_array($service_id, $enabled_service_ids)) {
+                                    $enabled_count++;
+                                } else {
+                                    $disabled_count++;
+                                }
+                            }
+                        ?>
                             <tr>
                                 <td><strong><?php echo esc_html($set['name']); ?></strong></td>
-                                <td><?php echo count($set['service_ids']); ?> <?php _e('services', 'konfidens-appointment-booking'); ?></td>
+                                <td>
+                                    <?php echo $enabled_count; ?> <?php _e('enabled', 'konfidens-appointment-booking'); ?>
+                                    <?php if ($disabled_count > 0): ?>
+                                        <span style="color: #d63638; margin-left: 5px;">
+                                            (<?php echo $disabled_count; ?> <?php _e('disabled', 'konfidens-appointment-booking'); ?>)
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
                                 <td>
                                     <code style="background: #f0f0f0; padding: 5px 10px; border-radius: 3px; display: block; margin-bottom: 5px;">
                                         [su_button set="<?php echo esc_attr($set_id); ?>"]<?php _e('Book Appointment', 'konfidens-appointment-booking'); ?>[/su_button]

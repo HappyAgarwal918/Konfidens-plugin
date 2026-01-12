@@ -268,7 +268,12 @@ function kab_get_all_therapists() {
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     
     if ($services_response['success'] && !empty($services_response['data'])) {
-        $services = $services_response['data'];
+        // Filter only enabled services (same as old plugin)
+        $services = array_filter($services_response['data'], function ($service) {
+            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+        });
+        // Re-index array after filtering
+        $services = array_values($services);
         
         // For each service, get specialists
         foreach ($services as $service) {

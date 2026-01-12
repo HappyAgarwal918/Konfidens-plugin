@@ -17,7 +17,13 @@ function kab_display_services_page() {
     $services = array();
     
     if ($services_response['success'] && !empty($services_response['data'])) {
-        $services = $services_response['data'];
+        // Filter only enabled services (same as old plugin)
+        $services = array_filter($services_response['data'], function ($service) {
+            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+        });
+        
+        // Re-index array after filtering
+        $services = array_values($services);
         
         // Auto-import services if requested
         if (isset($_GET['import']) && $_GET['import'] == '1') {
@@ -170,10 +176,26 @@ function kab_display_services_page() {
                         $table_name_count = $wpdb->prefix . 'kab_booking_form_data';
                         $booking_counts = $wpdb->get_results("SELECT service_ids, COUNT(*) as total FROM $table_name_count GROUP BY service_ids", OBJECT_K);
                         
+                        // Batch load all service locations and categories in one query (performance optimization)
+                        $location_service_table = $wpdb->prefix . 'kab_location_service';
+                        $all_service_data = $wpdb->get_results("SELECT service_id, location_ids, category_id FROM $location_service_table", OBJECT_K);
+                        
+                        // Create lookup arrays for fast access
+                        $service_locations_map = array();
+                        $service_categories_map = array();
+                        foreach ($all_service_data as $service_id => $data) {
+                            if (!empty($data->location_ids)) {
+                                $service_locations_map[$service_id] = explode(',', $data->location_ids);
+                            } else {
+                                $service_locations_map[$service_id] = array();
+                            }
+                            $service_categories_map[$service_id] = !empty($data->category_id) ? intval($data->category_id) : null;
+                        }
+                        
                         foreach ($services as $service): 
-                            // Get service locations and category
-                            $service_locations = kab_get_service_locations($service['id']);
-                            $service_category_id = kab_get_service_category_id($service['id']);
+                            // Get service locations and category from lookup arrays (fast, no database query)
+                            $service_locations = isset($service_locations_map[$service['id']]) ? $service_locations_map[$service['id']] : array();
+                            $service_category_id = isset($service_categories_map[$service['id']]) ? $service_categories_map[$service['id']] : null;
                             // Get price from API only
                             // Helper function to extract price (handles arrays and objects)
                             // Converts from cents to main currency unit if needed
@@ -233,12 +255,7 @@ function kab_display_services_page() {
                                 }
                             }
                             
-                            // If not found in service object, try the function
-                            if (empty($price)) {
-                                $price = kab_get_service_price($service['id']);
-                            }
-                            
-                            // If still empty, default to 0
+                            // If not found, default to 0 (don't make additional API calls)
                             if (empty($price)) {
                                 $price = '0';
                             }
@@ -497,7 +514,12 @@ function kab_get_service_by_id($service_id) {
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     
     if ($services_response['success'] && !empty($services_response['data'])) {
-        foreach ($services_response['data'] as $service) {
+        // Filter only enabled services (same as old plugin)
+        $services = array_filter($services_response['data'], function ($service) {
+            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+        });
+        
+        foreach ($services as $service) {
             if ($service['id'] === $service_id) {
                 return $service;
             }
@@ -515,7 +537,35 @@ function kab_get_services_with_priority() {
     $services = array();
     
     if ($services_response['success'] && !empty($services_response['data'])) {
-        foreach ($services_response['data'] as $service) {
+        // Filter only enabled services (same as old plugin)
+        $enabled_services = array_filter($services_response['data'], function ($service) {
+            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+        });
+        
+        // Batch load all service categories in one query (performance optimization)
+        global $wpdb;
+        $location_service_table = $wpdb->prefix . 'kab_location_service';
+        $service_category_table = $wpdb->prefix . 'kab_service_category';
+        
+        // Get all service-category mappings in one query
+        $all_service_categories = $wpdb->get_results("SELECT service_id, category_id FROM $location_service_table", OBJECT_K);
+        
+        // Get all categories in one query
+        $all_categories_raw = $wpdb->get_results("SELECT * FROM $service_category_table", OBJECT_K);
+        
+        // Create lookup array for categories (keyed by category ID)
+        $all_categories = array();
+        foreach ($all_categories_raw as $cat) {
+            $all_categories[$cat->id] = $cat;
+        }
+        
+        // Create lookup arrays for fast access
+        $service_category_map = array();
+        foreach ($all_service_categories as $service_id => $data) {
+            $service_category_map[$service_id] = !empty($data->category_id) ? intval($data->category_id) : null;
+        }
+        
+        foreach ($enabled_services as $service) {
             // Get price from API only (prices are fetched from Konfidens API, not stored in database)
             // Helper function to safely extract price (handles arrays and objects)
             // Also converts from cents to main currency unit if needed
@@ -575,12 +625,7 @@ function kab_get_services_with_priority() {
                 }
             }
             
-            // If not found in service object, try the function
-            if (empty($service['price'])) {
-                $service['price'] = kab_get_service_price($service['id']);
-            }
-            
-            // If still empty, default to 0
+            // If not found, default to 0 (don't make additional API calls)
             if (empty($service['price'])) {
                 $service['price'] = '0';
             }
@@ -588,17 +633,12 @@ function kab_get_services_with_priority() {
             // Ensure price is always a string
             $service['price'] = (string) $service['price'];
             
-            // Get category information
-            $category_id = kab_get_service_category_id($service['id']);
-            if ($category_id !== null) {
-                $category = kab_get_service_category_by_id($category_id);
-                if ($category) {
-                    $service['category_id'] = $category_id;
-                    $service['category_name'] = $category->category_name;
-                } else {
-                    $service['category_id'] = null;
-                    $service['category_name'] = null;
-                }
+            // Get category information from lookup arrays (fast, no database query)
+            $category_id = isset($service_category_map[$service['id']]) ? $service_category_map[$service['id']] : null;
+            if ($category_id !== null && isset($all_categories[$category_id])) {
+                $category = $all_categories[$category_id];
+                $service['category_id'] = $category_id;
+                $service['category_name'] = $category->category_name;
             } else {
                 $service['category_id'] = null;
                 $service['category_name'] = null;

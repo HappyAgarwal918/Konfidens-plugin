@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.9
+ * Version: 1.0.10
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.9');
+define('KAB_VERSION', '1.0.10');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -335,7 +335,31 @@ function kab_button_shortcode($atts, $content = null) {
         $set_id = sanitize_text_field($atts['set']);
         
         if (isset($service_sets[$set_id]) && !empty($service_sets[$set_id]['service_ids'])) {
-            $service_ids = $service_sets[$set_id]['service_ids'];
+            $set_service_ids = $service_sets[$set_id]['service_ids'];
+            
+            // Get enabled services to filter out disabled ones
+            $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
+            $enabled_service_ids = array();
+            
+            if ($services_response['success'] && !empty($services_response['data'])) {
+                // Filter only enabled services
+                $enabled_services = array_filter($services_response['data'], function ($service) {
+                    return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
+                });
+                
+                // Create array of enabled service IDs
+                foreach ($enabled_services as $service) {
+                    if (isset($service['id'])) {
+                        $enabled_service_ids[] = $service['id'];
+                    }
+                }
+            }
+            
+            // Filter service set to only include enabled services
+            $service_ids = array_filter($set_service_ids, function($service_id) use ($enabled_service_ids) {
+                return in_array($service_id, $enabled_service_ids);
+            });
+            $service_ids = array_values($service_ids); // Re-index
         }
     }
     
