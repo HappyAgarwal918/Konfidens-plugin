@@ -302,7 +302,7 @@
                             filteredServiceIds = new Set(parsed.map(id => String(id).trim()).filter(id => id !== ''));
                         }
                     } catch (e) {
-                        console.warn('KAB Main Form - Error parsing service IDs:', e);
+                        // Error parsing service IDs - continue with default behavior
                     }
                 }
             }
@@ -994,7 +994,6 @@
             // Get the actual step number
             const actualStep = this.getActualStep(logicalStep);
             if (!actualStep) {
-                console.warn('Invalid logical step:', logicalStep);
                 return;
             }
             

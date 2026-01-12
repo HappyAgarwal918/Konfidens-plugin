@@ -23,6 +23,16 @@ function kab_add_admin_menu() {
         30
     );
     
+    // Service Categories submenu
+    add_submenu_page(
+        'konfidens',
+        __('Service Categories', 'konfidens-appointment-booking'),
+        __('Service Categories', 'konfidens-appointment-booking'),
+        'manage_options',
+        'konfidens-service-categories',
+        'kab_display_service_categories_page'
+    );
+    
     // Services submenu
     add_submenu_page(
         'konfidens',
@@ -727,9 +737,8 @@ function kab_display_service_sets_page() {
                                 </td>
                                 <td>
                                     <code style="background: #f0f0f0; padding: 5px 10px; border-radius: 3px; display: block; margin-bottom: 5px;">
-                                        [su_button set="<?php echo esc_attr($set_id); ?>"]<?php _e('Book Appointment', 'konfidens-appointment-booking'); ?>[/su_button]
+                                        [su_button set="<?php echo esc_attr($set_id); ?>"]<?php _e('Text', 'konfidens-appointment-booking'); ?>[/su_button]
                                     </code>
-                                    <small style="color: #666;"><?php _e('Main Form', 'konfidens-appointment-booking'); ?></small>
                                 </td>
                                 <td>
                                     <a href="<?php echo admin_url('admin.php?page=konfidens-service-sets&edit_set=' . esc_attr($set_id)); ?>" class="button button-small">

@@ -58,6 +58,9 @@ function kab_display_locations_page() {
                         __('Location updated successfully.', 'konfidens-appointment-booking'),
                         'success'
                     );
+                    // Redirect to avoid resubmission and reset form to "Add New" mode
+                    wp_redirect(admin_url('admin.php?page=konfidens-locations&updated=1'));
+                    exit;
                 } else {
                     add_settings_error(
                         'kab_locations',
@@ -76,6 +79,9 @@ function kab_display_locations_page() {
                         __('Location added successfully.', 'konfidens-appointment-booking'),
                         'success'
                     );
+                    // Redirect to avoid resubmission
+                    wp_redirect(admin_url('admin.php?page=konfidens-locations&added=1'));
+                    exit;
                 } else {
                     add_settings_error(
                         'kab_locations',
@@ -100,6 +106,9 @@ function kab_display_locations_page() {
                 __('Location deleted successfully.', 'konfidens-appointment-booking'),
                 'success'
             );
+            // Redirect to avoid resubmission
+            wp_redirect(admin_url('admin.php?page=konfidens-locations&deleted=1'));
+            exit;
         } else {
             add_settings_error(
                 'kab_locations',
@@ -134,6 +143,32 @@ function kab_display_locations_page() {
     if (isset($_GET['edit_category'])) {
         $editing_category_id_for_category = intval($_GET['edit_category']);
         $editing_category = kab_get_location_category_by_id($editing_category_id_for_category);
+    }
+    
+    // Show success messages after redirect
+    if (isset($_GET['updated']) && $_GET['updated'] == '1') {
+        add_settings_error(
+            'kab_locations',
+            'kab_location_updated',
+            __('Location updated successfully.', 'konfidens-appointment-booking'),
+            'success'
+        );
+    }
+    if (isset($_GET['added']) && $_GET['added'] == '1') {
+        add_settings_error(
+            'kab_locations',
+            'kab_location_added',
+            __('Location added successfully.', 'konfidens-appointment-booking'),
+            'success'
+        );
+    }
+    if (isset($_GET['deleted']) && $_GET['deleted'] == '1') {
+        add_settings_error(
+            'kab_locations',
+            'kab_location_deleted',
+            __('Location deleted successfully.', 'konfidens-appointment-booking'),
+            'success'
+        );
     }
     
     settings_errors('kab_locations');

@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.0.11
+ * Version: 1.1.0
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.0.11');
+define('KAB_VERSION', '1.1.0');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -26,6 +26,7 @@ define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 require_once KAB_PLUGIN_DIR . 'kab-database.php';
 require_once KAB_PLUGIN_DIR . 'kab-activator.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-settings.php';
+require_once KAB_PLUGIN_DIR . 'admin/kab-admin-service-category.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-service.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-specialist.php';
 require_once KAB_PLUGIN_DIR . 'admin/kab-admin-location.php';

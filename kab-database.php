@@ -42,15 +42,32 @@ function kab_create_tables() {
         PRIMARY KEY (id)
     ) $charset_collate;");
     
+    // Create parent category table
+    $parent_category_table = $wpdb->prefix . 'kab_service_parent_category';
+    $wpdb->query("CREATE TABLE IF NOT EXISTS $parent_category_table (
+        id int(11) NOT NULL AUTO_INCREMENT,
+        parent_category_name varchar(255) NOT NULL,
+        created_at datetime DEFAULT CURRENT_TIMESTAMP,
+        updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id)
+    ) $charset_collate;");
+    
     // Create service category table
     $category_table = $wpdb->prefix . 'kab_service_category';
     $wpdb->query("CREATE TABLE IF NOT EXISTS $category_table (
         id int(11) NOT NULL AUTO_INCREMENT,
         category_name varchar(255) NOT NULL,
+        parent_category_id int(11) DEFAULT NULL,
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
     ) $charset_collate;");
+    
+    // Add parent_category_id column if it doesn't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $category_table LIKE 'parent_category_id'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $category_table ADD COLUMN parent_category_id int(11) DEFAULT NULL AFTER category_name");
+    }
     
     // Create location service table
     $location_service_table = $wpdb->prefix . 'kab_location_service';
@@ -271,9 +288,36 @@ function kab_delete_location_category($id) {
  */
 function kab_delete_location($id) {
     global $wpdb;
-    $table_name = $wpdb->prefix . 'kab_location';
+    $location_table = $wpdb->prefix . 'kab_location';
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
     
-    return $wpdb->delete($table_name, array('id' => $id));
+    // First, remove the deleted location ID from all service assignments
+    // Get all service records that might contain this location ID
+    $all_services = $wpdb->get_results("SELECT service_id, location_ids FROM $location_service_table WHERE location_ids != '' AND location_ids IS NOT NULL");
+    
+    foreach ($all_services as $service) {
+        if (!empty($service->location_ids)) {
+            // Split location IDs into array
+            $location_ids = explode(',', $service->location_ids);
+            // Remove the deleted location ID
+            $location_ids = array_filter($location_ids, function($loc_id) use ($id) {
+                return trim($loc_id) != $id;
+            });
+            // Re-index array
+            $location_ids = array_values($location_ids);
+            
+            // Update the service record with cleaned location IDs
+            $updated_location_ids = !empty($location_ids) ? implode(',', $location_ids) : '';
+            $wpdb->query($wpdb->prepare(
+                "UPDATE $location_service_table SET location_ids = %s WHERE service_id = %s",
+                $updated_location_ids,
+                $service->service_id
+            ));
+        }
+    }
+    
+    // Then delete the location
+    return $wpdb->delete($location_table, array('id' => $id));
 }
 
 /**
@@ -372,8 +416,106 @@ function kab_delete_service_category($id) {
         $id
     ));
     
+    // Remove parent category assignment from service categories
+    $wpdb->query($wpdb->prepare(
+        "UPDATE $category_table SET parent_category_id = NULL WHERE parent_category_id = %d",
+        $id
+    ));
+    
     // Then delete the category
     return $wpdb->delete($category_table, array('id' => $id));
+}
+
+/**
+ * Get all service parent categories
+ */
+function kab_get_service_parent_categories() {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_parent_category';
+    
+    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY parent_category_name ASC");
+}
+
+/**
+ * Get service parent category by ID
+ */
+function kab_get_service_parent_category_by_id($id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_parent_category';
+    
+    return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $id));
+}
+
+/**
+ * Add a new service parent category
+ */
+function kab_add_service_parent_category($parent_category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_parent_category';
+    
+    $result = $wpdb->insert(
+        $table_name,
+        array('parent_category_name' => sanitize_text_field($parent_category_name))
+    );
+    
+    return $result ? $wpdb->insert_id : false;
+}
+
+/**
+ * Update a service parent category
+ */
+function kab_update_service_parent_category($id, $parent_category_name) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_parent_category';
+    
+    return $wpdb->update(
+        $table_name,
+        array('parent_category_name' => sanitize_text_field($parent_category_name)),
+        array('id' => $id)
+    );
+}
+
+/**
+ * Delete a service parent category
+ */
+function kab_delete_service_parent_category($id) {
+    global $wpdb;
+    $parent_category_table = $wpdb->prefix . 'kab_service_parent_category';
+    $category_table = $wpdb->prefix . 'kab_service_category';
+    
+    // First, remove parent category assignment from all service categories
+    $wpdb->query($wpdb->prepare(
+        "UPDATE $category_table SET parent_category_id = NULL WHERE parent_category_id = %d",
+        $id
+    ));
+    
+    // Then delete the parent category
+    return $wpdb->delete($parent_category_table, array('id' => $id));
+}
+
+/**
+ * Update service category parent category assignment
+ */
+function kab_update_service_category_parent($category_id, $parent_category_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_service_category';
+    
+    // Convert to integer if set, otherwise null
+    $parent_id_value = ($parent_category_id !== null && $parent_category_id !== '' && $parent_category_id !== '0') ? intval($parent_category_id) : null;
+    
+    if ($parent_id_value === null) {
+        // Use raw SQL to set NULL
+        return $wpdb->query($wpdb->prepare(
+            "UPDATE $table_name SET parent_category_id = NULL WHERE id = %d",
+            $category_id
+        )) !== false;
+    } else {
+        return $wpdb->update(
+            $table_name,
+            array('parent_category_id' => $parent_id_value),
+            array('id' => $category_id)
+        ) !== false;
+    }
 }
 
 /**
@@ -453,28 +595,55 @@ function kab_get_service_price($service_id) {
 /**
  * Add or update service location
  */
-function kab_add_update_service_location($service_id, $location_ids) {
+function kab_add_update_service_location($service_id, $location_ids, $category_id = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_service';
     
     $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
     
+    // Handle category_id - convert to integer if set, otherwise null
+    $category_id_value = ($category_id !== null && $category_id !== '' && $category_id !== '0') ? intval($category_id) : null;
+    
     if ($existing) {
         // Update existing record
-        $result = $wpdb->query($wpdb->prepare(
-            "UPDATE $table_name SET location_ids = %s WHERE service_id = %s",
-            sanitize_text_field($location_ids),
-            $service_id
-        ));
-        return $result !== false;
+        if ($category_id_value === null) {
+            // Use raw SQL to set NULL
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, category_id = NULL WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $service_id
+            ));
+            return $result !== false;
+        } else {
+            $result = $wpdb->query($wpdb->prepare(
+                "UPDATE $table_name SET location_ids = %s, category_id = %d WHERE service_id = %s",
+                sanitize_text_field($location_ids),
+                $category_id_value,
+                $service_id
+            ));
+            return $result !== false;
+        }
     } else {
         // Insert new record
-        $result = $wpdb->query($wpdb->prepare(
-            "INSERT INTO $table_name (service_id, location_ids) VALUES (%s, %s)",
-            sanitize_text_field($service_id),
-            sanitize_text_field($location_ids)
-        ));
-        return $result ? $wpdb->insert_id : false;
+        if ($category_id_value === null) {
+            $result = $wpdb->query($wpdb->prepare(
+                "INSERT INTO $table_name (service_id, location_ids, category_id) VALUES (%s, %s, NULL)",
+                sanitize_text_field($service_id),
+                sanitize_text_field($location_ids)
+            ));
+            return $result ? $wpdb->insert_id : false;
+        } else {
+            $result = $wpdb->insert(
+                $table_name,
+                array(
+                    'service_id' => sanitize_text_field($service_id),
+                    'location_ids' => sanitize_text_field($location_ids),
+                    'category_id' => $category_id_value
+                ),
+                array('%s', '%s', '%d')
+            );
+            return $result ? $wpdb->insert_id : false;
+        }
     }
 }
 

@@ -4,13 +4,15 @@ A comprehensive WordPress plugin for appointment booking using the Konfidens API
 
 ## Overview
 
-The Konfidens Appointment Booking plugin integrates with the Konfidens API to provide a seamless booking experience for therapy services. It offers flexible configuration options and enabling contextual booking options throughout the website.
+The Konfidens Appointment Booking plugin integrates with the Konfidens API to provide a seamless booking experience for therapy services. It offers flexible configuration options and enables contextual booking options throughout the website.
 
 ## Features
 
 - Integration with Konfidens API for real-time appointment booking
-- Mapping of therapists to service categories
-- Service categorization by location type
+- Service management with category assignment
+- Service category management with parent category support
+- Location management with category assignment
+- Therapist/specialist management
 - Real-time availability checking
 - Interactive calendar for date selection
 - Time slot selection
@@ -21,6 +23,7 @@ The Konfidens Appointment Booking plugin integrates with the Konfidens API to pr
 - Responsive design for mobile and desktop
 - Popup booking form option
 - Shortcode integration
+- Service sets for predefined service groups
 
 ## Backend Architecture
 
@@ -28,19 +31,36 @@ The Konfidens Appointment Booking plugin integrates with the Konfidens API to pr
 
 The plugin creates several custom database tables upon activation:
 
-1. **`{prefix}_kab_location`**: Add Location
+1. **`{prefix}_kab_location`**: Stores location information
    - `id`: Auto-increment ID
    - `location_name`: Location Name
+   - `category_id`: Location category ID
    - `created_at`/`updated_at`: Timestamps
 
-2. **`{prefix}_kab_location_service`**: Add mapping of Location Service
+2. **`{prefix}_kab_location_category`**: Stores location categories
+   - `id`: Auto-increment ID
+   - `category_name`: Category name
+   - `created_at`/`updated_at`: Timestamps
+
+3. **`{prefix}_kab_location_service`**: Maps services to locations and categories
    - `id`: Auto-increment ID
    - `service_id`: Konfidens service ID
-   - `location_ids`: Location IDs
+   - `location_ids`: Comma-separated location IDs
    - `category_id`: Service category ID
    - `created_at`/`updated_at`: Timestamps
 
-3. **`{prefix}_kab_setting`**: Stores API configuration and settings
+4. **`{prefix}_kab_service_category`**: Stores service categories
+   - `id`: Auto-increment ID
+   - `category_name`: Category name
+   - `parent_category_id`: Parent category ID (for hierarchical categories)
+   - `created_at`/`updated_at`: Timestamps
+
+5. **`{prefix}_kab_service_parent_category`**: Stores parent categories for service categories
+   - `id`: Auto-increment ID
+   - `parent_category_name`: Parent category name
+   - `created_at`/`updated_at`: Timestamps
+
+6. **`{prefix}_kab_setting`**: Stores API configuration and settings
    - `id`: Auto-increment ID
    - `base_url`: Konfidens API base URL
    - `api_key`: API authentication key
@@ -49,13 +69,14 @@ The plugin creates several custom database tables upon activation:
    - `booking_msg`: Customizable booking message
    - `created_at`/`updated_at`: Timestamps
 
-4. **`{prefix}_kab_location_specialist`: Add mapping of location and specialist
+7. **`{prefix}_kab_location_specialist`**: Maps locations to specialists
    - `id`: Auto-increment ID
-   - `location_ids`: Location IDs
+   - `location_ids`: Comma-separated location IDs
    - `specialist_id`: Specialist ID
+   - `tags`: Specialist tags
    - `created_at`/`updated_at`: Timestamps
 
-5. **`{prefix}_kab_booking_form_data`**: Stores booking information
+8. **`{prefix}_kab_booking_form_data`**: Stores booking information
    - `id`: Auto-increment ID
    - `service_ids`: Service ID
    - `service_name`: Service name
@@ -77,6 +98,7 @@ The plugin communicates with the Konfidens API using the following endpoints:
 
 1. **Services API**: `/services?clinic_id={CLINIC_ID}`
    - Retrieves all available services for the clinic
+   - Filters out disabled services (where `code !== null` or `enabled_by_specialists` is empty)
 
 2. **Specialists API**: `/specialists?clinic_id={CLINIC_ID}&service_id={SERVICE_ID}`
    - Retrieves specialists/therapists available for a specific service
@@ -92,22 +114,26 @@ The plugin communicates with the Konfidens API using the following endpoints:
 
 1. **Service Selection**:
    - The plugin fetches all available services from the Konfidens API
-   - Services are displayed in the backend services menu inside Konfidens
+   - Services are filtered to show only enabled services
+   - Services can be assigned to categories in the admin panel
    - Services are displayed in the booking form
 
-2. **Location Selection**: Show all location based on selected service
+2. **Location Selection**: 
+   - Shows all locations based on selected service
+   - Locations can be assigned to categories
+   - Locations are filtered based on service assignments
 
-2. **Specialist Selection**:
+3. **Specialist Selection**:
    - When a service is selected, the plugin fetches specialists who can provide that service
    - Specialists are displayed with their profile image, name, and description
    - The plugin checks for available time slots for each specialist
 
-3. **Date & Time Selection**:
+4. **Date & Time Selection**:
    - Available dates are fetched for the selected specialist and service
    - The calendar shows only dates with available slots
    - When a date is selected, available time slots are displayed
 
-4. **Booking Process**:
+5. **Booking Process**:
    - User fills in personal information
    - Form validates all required fields
    - Google reCAPTCHA verifies the user is not a bot
@@ -116,14 +142,6 @@ The plugin communicates with the Konfidens API using the following endpoints:
    - Confirmation email is sent
    - User receives a confirmation message
 
-4. **Services → Specialists**:
-   - Each service can be provided by multiple specialists
-   - This relationship comes from the Konfidens API
-
-5. **Specialists → Categories**:
-   - Specialists can be associated with specific categories
-   - This allows filtering specialists by location type
-
 ## Frontend Components
 
 ### Shortcodes
@@ -131,53 +149,58 @@ The plugin communicates with the Konfidens API using the following endpoints:
 1. **`[su_button]Book Now[/su_button]`**: Creates a button that opens the booking form in a popup
    - Flow: Service → Location → Therapist → Date & Time → Personal Details
 
-2. **`[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]`**: Creates a button with pre-selected therapist
+2. **`[su_button service_ids="ID1,ID2"]Book Now[/su_button]`**: Creates a button with pre-selected services
+   - Flow: Service (pre-selected) → Location → Therapist → Date & Time → Personal Details
+
+3. **`[su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button]`**: Creates a button with pre-selected therapist
    - Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details
    - Note: Therapist can be changed during the booking process
 
-### multistep form
-step 1. **Service Selection**: Shows all available services
-step 2. **Category Selection**: Show all category based on selected service
-step 3. **Specialist Selection**: filter specialist based on selected service and category and Uses a slider to browse and select specialists
-step 4. **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
-step 5. **Form Submission**: Handles validation and API submission
-step 6. **Booking Confirmation**: Shows success message and booking details
+### Multistep Form
 
-If service is preselected in shortcode then -
-step 1. **Service Selection**: skipped
-step 2. **Category Selection**: Show all category based on selected service
-step 3. **Specialist Selection**: filter specialist based on selected service and category and Uses a slider to browse and select specialists
-step 4. **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
-step 5. **Form Submission**: Handles validation and API submission
-step 6. **Booking Confirmation**: Shows success message and booking details
+**Standard Flow:**
+- Step 1: **Service Selection**: Shows all available services
+- Step 2: **Location Selection**: Shows locations based on selected service
+- Step 3: **Specialist Selection**: Filters specialists based on selected service and location. Uses a slider to browse and select specialists
+- Step 4: **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
+- Step 5: **Form Submission**: Handles validation and API submission
+- Step 6: **Booking Confirmation**: Shows success message and booking details
 
-If specialist is preselected in shortcode then -
-step 1. **Service Selection**: Shows all available services based on selected specialist
-step 2. **Category Selection**: Show all category based on selected service and specialist also in this step there is an option to change specialist
-step 3. **Specialist Selection**: skipped
-step 4. **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
-step 5. **Form Submission**: Handles validation and API submission
-step 6. **Booking Confirmation**: Shows success message and booking details
+**If service is pre-selected in shortcode:**
+- Step 1: **Service Selection**: Skipped
+- Step 2: **Location Selection**: Shows locations based on selected service
+- Step 3: **Specialist Selection**: Filters specialists based on selected service and location
+- Step 4: **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
+- Step 5: **Form Submission**: Handles validation and API submission
+- Step 6: **Booking Confirmation**: Shows success message and booking details
 
+**If specialist is pre-selected in shortcode:**
+- Step 1: **Service Selection**: Shows all available services based on selected specialist
+- Step 2: **Location Selection**: Shows locations based on selected service, with option to change specialist
+- Step 3: **Specialist Selection**: Skipped
+- Step 4: **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
+- Step 5: **Form Submission**: Handles validation and API submission
+- Step 6: **Booking Confirmation**: Shows success message and booking details
 
 ## Admin Interface
 
 The plugin provides several admin pages for configuration:
 
 1. **Konfidens**: Main menu item
-Sub menu -
-2. **Services**: Show all service information (service_id, service_name, service_duration, service_price, total_booking)
-3. **Categories**: Manages category information (add category, remove category)
-4. **Mapping Categories with Therapist**: Maps categories to therapists (add, remove, update). Multiple categories can be mapped to a single therapist.
-5. **Therapist**: Show all therapists with their specialist id
-6. **Settings**: Configures API credentials and general settings (Base URL, API Key, Clinic ID, Primary Color, Booking Message, Mail settings)
+   - **Service Categories**: Manage service categories and parent categories (CRUD operations)
+   - **Services**: Show all service information (service_id, service_name, service_duration, service_price, total_booking). Assign categories and locations to services
+   - **Therapists**: Show all therapists with their specialist ID. Assign locations and tags to therapists
+   - **Locations**: Manage locations and location categories (CRUD operations). Assign categories to locations
+   - **Service Sets**: Create and manage predefined groups of services for use in shortcodes
+   - **Settings**: Configures API credentials and general settings (Base URL, API Key, Clinic ID, Primary Color, Booking Message, Mail settings)
+   - **Bookings**: View all booking records
 
 ## Installation
 
 1. Upload the plugin files to the `/wp-content/plugins/konfidens-appointment-booking` directory
 2. Activate the plugin through the 'Plugins' menu in WordPress
 3. Go to 'Konfidens' > 'Settings' to configure API credentials
-4. Set up other settings as needed
+4. Set up locations, services, and other settings as needed
 
 ## Plugin Structure
 
@@ -191,6 +214,7 @@ The plugin is organized into the following structure:
 
 ### Admin Files
 - `admin/kab-admin-settings.php`: Admin settings functionality
+- `admin/kab-admin-service-category.php`: Service category management
 - `admin/kab-admin-service.php`: Service management functionality
 - `admin/kab-admin-specialist.php`: Specialist management functionality
 - `admin/kab-admin-location.php`: Location management functionality
@@ -202,6 +226,7 @@ The plugin is organized into the following structure:
 - `frontend/kab-email.php`: Email notification functionality
 - `frontend/assets/public.css`: Frontend CSS styles
 - `frontend/assets/public.js`: Frontend JavaScript functionality
+- `frontend/assets/public-therapist-first.js`: Frontend JavaScript for therapist-first flow
 - `frontend/templates/form-template.php`: Form template
 - `frontend/templates/thank-you-template.php`: Thank you page template
 - `frontend/templates/email-template.php`: Email template
@@ -214,6 +239,12 @@ Add a button that opens the booking form in a popup with full flow:
 
 ```
 [su_button]Book Now[/su_button]
+```
+
+To pre-select specific services:
+
+```
+[su_button service_ids="123,456"]Book Selected Services[/su_button]
 ```
 
 To pre-select a specific therapist:
@@ -256,6 +287,7 @@ The plugin creates a custom endpoint `/booking/thanks` that displays a thank you
 - Google reCAPTCHA integration
 - API key protection
 - Nonce verification for AJAX requests
+- Permission checks for admin operations
 
 ## Customization
 
@@ -282,5 +314,3 @@ For support inquiries, please contact the plugin author.
 ## License
 
 This plugin is licensed under the GPL v2 or later.
-
----
