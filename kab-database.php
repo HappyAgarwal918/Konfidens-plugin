@@ -453,57 +453,28 @@ function kab_get_service_price($service_id) {
 /**
  * Add or update service location
  */
-function kab_add_update_service_location($service_id, $location_ids, $category_id = null) {
+function kab_add_update_service_location($service_id, $location_ids) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_service';
     
     $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
     
-    // Handle category_id - convert to integer if set, otherwise null
-    $category_id_value = ($category_id !== null && $category_id !== '') ? intval($category_id) : null;
-    
     if ($existing) {
-        // For update, we need to handle NULL properly
-        if ($category_id_value === null) {
-            // Use raw SQL to set NULL
-            $result = $wpdb->query($wpdb->prepare(
-                "UPDATE $table_name SET location_ids = %s, category_id = NULL WHERE service_id = %s",
-                sanitize_text_field($location_ids),
-                $service_id
-            ));
-            return $result !== false;
-        } else {
-            // Use raw SQL to ensure proper update (wpdb->update can return 0 if no change, which is falsy)
-            $result = $wpdb->query($wpdb->prepare(
-                "UPDATE $table_name SET location_ids = %s, category_id = %d WHERE service_id = %s",
-                sanitize_text_field($location_ids),
-                $category_id_value,
-                $service_id
-            ));
-            return $result !== false;
-        }
+        // Update existing record
+        $result = $wpdb->query($wpdb->prepare(
+            "UPDATE $table_name SET location_ids = %s WHERE service_id = %s",
+            sanitize_text_field($location_ids),
+            $service_id
+        ));
+        return $result !== false;
     } else {
-        // For insert, we need to handle NULL properly
-        if ($category_id_value === null) {
-            // Use raw SQL to insert NULL
-            $result = $wpdb->query($wpdb->prepare(
-                "INSERT INTO $table_name (service_id, location_ids, category_id) VALUES (%s, %s, NULL)",
-                sanitize_text_field($service_id),
-                sanitize_text_field($location_ids)
-            ));
-            return $result ? $wpdb->insert_id : false;
-        } else {
-            $result = $wpdb->insert(
-                $table_name,
-                array(
-                    'service_id' => sanitize_text_field($service_id),
-                    'location_ids' => sanitize_text_field($location_ids),
-                    'category_id' => $category_id_value
-                ),
-                array('%s', '%s', '%d')
-            );
-            return $result ? $wpdb->insert_id : false;
-        }
+        // Insert new record
+        $result = $wpdb->query($wpdb->prepare(
+            "INSERT INTO $table_name (service_id, location_ids) VALUES (%s, %s)",
+            sanitize_text_field($service_id),
+            sanitize_text_field($location_ids)
+        ));
+        return $result ? $wpdb->insert_id : false;
     }
 }
 
@@ -671,18 +642,17 @@ function kab_import_services($services) {
         
         // Check if service already exists in database
         $existing_locations = kab_get_service_locations($service['id']);
-        $existing_category_id = kab_get_service_category_id($service['id']);
         
         // Only update if service doesn't exist yet
         if (empty($existing_locations)) {
-            // Service doesn't exist - create entry with blank location and category
-            $result = kab_add_update_service_location($service['id'], '', null);
+            // Service doesn't exist - create entry with blank location
+            $result = kab_add_update_service_location($service['id'], '');
             
             if ($result !== false) {
                 $imported++;
             }
         } else {
-            // Service already exists - preserve existing locations and category
+            // Service already exists - preserve existing locations
             // Just count it as imported/updated
             $imported++;
         }

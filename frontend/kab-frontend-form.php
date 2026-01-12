@@ -29,12 +29,8 @@ function kab_get_services() {
     // Get all services
     $services = kab_get_services_with_priority();
     
-    // Get all categories for grouping
-    $categories = kab_get_service_categories();
-    
     $result = array(
-        'services' => $services,
-        'categories' => $categories
+        'services' => $services
     );
     
     // Cache for 5 minutes
@@ -320,12 +316,8 @@ function kab_get_services_for_therapist_ajax() {
         }
     }
     
-    // Get all categories for grouping (single database query)
-    $categories = kab_get_service_categories();
-    
     $result = array(
-        'services' => $therapist_services,
-        'categories' => $categories
+        'services' => $therapist_services
     );
     
     // Cache the result for 5 minutes
