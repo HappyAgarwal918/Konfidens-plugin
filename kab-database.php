@@ -292,28 +292,18 @@ function kab_delete_location($id) {
     $location_service_table = $wpdb->prefix . 'kab_location_service';
     
     // First, remove the deleted location ID from all service assignments
-    // Get all service records that might contain this location ID
-    $all_services = $wpdb->get_results("SELECT service_id, location_ids FROM $location_service_table WHERE location_ids != '' AND location_ids IS NOT NULL");
+    // Get all service records that have this location ID (services now only have one location)
+    $all_services = $wpdb->get_results($wpdb->prepare(
+        "SELECT service_id, location_ids FROM $location_service_table WHERE location_ids = %s",
+        $id
+    ));
     
     foreach ($all_services as $service) {
-        if (!empty($service->location_ids)) {
-            // Split location IDs into array
-            $location_ids = explode(',', $service->location_ids);
-            // Remove the deleted location ID
-            $location_ids = array_filter($location_ids, function($loc_id) use ($id) {
-                return trim($loc_id) != $id;
-            });
-            // Re-index array
-            $location_ids = array_values($location_ids);
-            
-            // Update the service record with cleaned location IDs
-            $updated_location_ids = !empty($location_ids) ? implode(',', $location_ids) : '';
-            $wpdb->query($wpdb->prepare(
-                "UPDATE $location_service_table SET location_ids = %s WHERE service_id = %s",
-                $updated_location_ids,
-                $service->service_id
-            ));
-        }
+        // Clear the location_id since it matches the deleted location
+        $wpdb->query($wpdb->prepare(
+            "UPDATE $location_service_table SET location_ids = '' WHERE service_id = %s",
+            $service->service_id
+        ));
     }
     
     // Then delete the location
@@ -329,11 +319,12 @@ function kab_get_service_locations($service_id) {
     
     $service_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
     
-    if ($service_location) {
-        return explode(',', $service_location->location_ids);
+    if ($service_location && !empty($service_location->location_ids)) {
+        // Return single location_id (services now only have one location)
+        return $service_location->location_ids;
     }
     
-    return array();
+    return '';
 }
 
 
@@ -348,6 +339,69 @@ function kab_get_service_category_id($service_id) {
     
     if ($service_location && $service_location->category_id !== null && $service_location->category_id !== '') {
         return intval($service_location->category_id);
+    }
+    
+    return null;
+}
+
+/**
+ * Get locations by category (locations that have services in the given category)
+ */
+function kab_get_locations_by_category($category_id) {
+    global $wpdb;
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
+    $location_table = $wpdb->prefix . 'kab_location';
+    
+    // Get all services in this category
+    $services = $wpdb->get_results($wpdb->prepare(
+        "SELECT service_id, location_ids FROM $location_service_table WHERE category_id = %d",
+        intval($category_id)
+    ));
+    
+    if (empty($services)) {
+        return array();
+    }
+    
+    // Collect all unique location IDs (services now only have one location)
+    $location_ids = array();
+    foreach ($services as $service) {
+        if (!empty($service->location_ids)) {
+            $loc_id = trim($service->location_ids);
+            if (!empty($loc_id) && !in_array($loc_id, $location_ids)) {
+                $location_ids[] = $loc_id;
+            }
+        }
+    }
+    
+    if (empty($location_ids)) {
+        return array();
+    }
+    
+    // Get location details
+    $location_ids_str = implode(',', array_map('intval', $location_ids));
+    $locations = $wpdb->get_results(
+        "SELECT * FROM $location_table WHERE id IN ($location_ids_str) ORDER BY location_name ASC"
+    );
+    
+    return $locations;
+}
+
+/**
+ * Get service by category and location
+ */
+function kab_get_service_by_category_location($category_id, $location_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_service';
+    
+    // Get service in this category with the requested location (services now only have one location)
+    $service = $wpdb->get_row($wpdb->prepare(
+        "SELECT service_id FROM $table_name WHERE category_id = %d AND location_ids = %s",
+        intval($category_id),
+        $location_id
+    ));
+    
+    if ($service && !empty($service->service_id)) {
+        return $service->service_id;
     }
     
     return null;
@@ -810,10 +864,10 @@ function kab_import_services($services) {
         }
         
         // Check if service already exists in database
-        $existing_locations = kab_get_service_locations($service['id']);
+        $existing_location = kab_get_service_locations($service['id']);
         
         // Only update if service doesn't exist yet
-        if (empty($existing_locations)) {
+        if (empty($existing_location)) {
             // Service doesn't exist - create entry with blank location
             $result = kab_add_update_service_location($service['id'], '');
             

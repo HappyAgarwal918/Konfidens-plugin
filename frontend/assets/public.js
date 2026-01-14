@@ -24,6 +24,7 @@
             this.serviceId = '';
             this.specialistId = '';
             this.locationId = '';
+            this.categoryId = ''; // Store selected category ID
             this.selectedDate = '';
             this.selectedTime = '';
             this.services = []; // Store services data with prices
@@ -122,7 +123,7 @@
             this.goToLogicalStep(firstLogicalStep);
             
             this.initEvents();
-            this.loadServices();
+            this.loadCategories();
         }
         
         /**
@@ -165,14 +166,14 @@
         initEvents() {
             const self = this;
             
-            // Service selection
-            this.$form.on('click', '.kab-service-item', function() {
-                const serviceId = $(this).data('service-id');
-                self.selectService(serviceId);
+            // Category selection (step 1)
+            this.$form.on('click', '.kab-category-item[data-category-id]', function() {
+                const categoryId = $(this).data('category-id');
+                self.selectCategory(categoryId);
             });
             
-            // Category selection
-            this.$form.on('click', '.kab-category-item', function() {
+            // Location selection (step 2) - locations now use kab-category-item class
+            this.$form.on('click', '.kab-category-item[data-location-id]', function() {
                 const locationId = $(this).data('location-id');
                 // User manually selected location, so auto-advance
                 self.selectLocation(locationId, true);
@@ -276,82 +277,7 @@
         }
         
         /**
-         * Load services
-         */
-        loadServices() {
-            const self = this;
-            const $servicesList = this.$form.find('.kab-services-list');
-            
-            // Read filtered service IDs from data attribute (if Service Set is used)
-            let filteredServiceIds = null;
-            const formElement = this.$form[0];
-            if (formElement) {
-                let serviceIdsAttr = formElement.getAttribute('data-service-ids');
-                if (serviceIdsAttr && serviceIdsAttr !== 'null' && serviceIdsAttr !== '' && serviceIdsAttr !== '[]') {
-                    try {
-                        // Decode HTML entities if present (WordPress esc_attr() encodes quotes)
-                        let decodedAttr = serviceIdsAttr;
-                        if (decodedAttr.includes('&quot;') || decodedAttr.includes('&amp;')) {
-                            const tempDiv = document.createElement('div');
-                            tempDiv.innerHTML = decodedAttr;
-                            decodedAttr = tempDiv.textContent || tempDiv.innerText || decodedAttr;
-                        }
-                        
-                        const parsed = JSON.parse(decodedAttr);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            filteredServiceIds = new Set(parsed.map(id => String(id).trim()).filter(id => id !== ''));
-                        }
-                    } catch (e) {
-                        // Error parsing service IDs - continue with default behavior
-                    }
-                }
-            }
-            
-            $.ajax({
-                url: kab_vars.ajax_url,
-                type: 'POST',
-                data: {
-                    action: 'kab_get_services',
-                    nonce: kab_vars.nonce
-                },
-                success: function(response) {
-                    if (response.success && response.data.services) {
-                        // Store services data for later use (including prices)
-                        let allServices = response.data.services;
-                        
-                        // Filter services if Service Set is specified
-                        if (filteredServiceIds && filteredServiceIds.size > 0) {
-                            allServices = allServices.filter(service => {
-                                const apiServiceId = String(service.id).trim();
-                                return filteredServiceIds.has(apiServiceId);
-                            });
-                        }
-                        
-                        self.services = allServices;
-                        
-                        // Render all services directly (no category grouping)
-                        const html = self.services.map(service => 
-                            `<div class="kab-service-item" data-service-id="${service.id}">
-                                <div class="kab-service-info">
-                                    <p>${service.name}</p>
-                                </div>
-                            </div>`
-                        ).join('');
-                        
-                        // Render services immediately
-                        $servicesList.html(html);
-                    } else {
-                        $servicesList.html('<div class="kab-no-data">' + kab_vars.no_services + '</div>');
-                    }
-                },
-                error: function() {
-                    $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
-                }
-            });
-        }
-        
-        /**
-         * Load locations
+         * Load categories (step 1) - grouped by parent categories
          */
         loadCategories() {
             const self = this;
@@ -363,22 +289,143 @@
                 url: kab_vars.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'kab_get_locations',
-                    service_id: this.serviceId,
+                    action: 'kab_get_categories',
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    if (response.success && response.data.categories) {
+                        const categories = response.data.categories;
+                        const parentCategories = response.data.parent_categories || [];
+                        
+                        // Group categories by parent_category_id
+                        const categoriesByParent = {};
+                        const uncategorizedCategories = [];
+                        
+                        // Initialize parent categories
+                        parentCategories.forEach(parentCat => {
+                            categoriesByParent[parentCat.id] = {
+                                parent: parentCat,
+                                categories: []
+                            };
+                        });
+                        
+                        // Group categories
+                        categories.forEach(category => {
+                            if (category.parent_category_id && categoriesByParent[category.parent_category_id]) {
+                                categoriesByParent[category.parent_category_id].categories.push(category);
+                            } else {
+                                uncategorizedCategories.push(category);
+                            }
+                        });
+                        
+                        // Build HTML with parent category groups
+                        let html = '';
+                        
+                        // Check if we have any categorized categories
+                        const hasCategorizedCategories = Object.values(categoriesByParent).some(parentData => parentData.categories.length > 0);
+                        
+                        if (hasCategorizedCategories) {
+                            // Render categorized categories in collapsible groups
+                            Object.values(categoriesByParent).forEach(parentData => {
+                                if (parentData.categories.length > 0) {
+                                    html += `<div class="kab-category-group">
+                                        <div class="kab-category-header" data-parent-category-id="${parentData.parent.id}">
+                                            <span class="kab-category-name">${parentData.parent.parent_category_name}</span>
+                                            <span class="kab-category-toggle">+</span>
+                                        </div>
+                                        <div class="kab-category-services" style="display: none;">
+                                            ${parentData.categories.map(category => 
+                                                `<div class="kab-category-item" data-category-id="${category.id}">
+                                                    <p class="kab-category-name">${category.category_name}</p>
+                                                </div>`
+                                            ).join('')}
+                                        </div>
+                                    </div>`;
+                                }
+                            });
+                            
+                            // Add uncategorized categories directly (without parent grouping)
+                            if (uncategorizedCategories.length > 0) {
+                                html += uncategorizedCategories.map(category => 
+                                    `<div class="kab-category-item" data-category-id="${category.id}">
+                                        <p class="kab-category-name">${category.category_name}</p>
+                                    </div>`
+                                ).join('');
+                            }
+                        } else {
+                            // No parent categories, render all categories directly
+                            html = categories.map(category => 
+                                `<div class="kab-category-item" data-category-id="${category.id}">
+                                    <p class="kab-category-name">${category.category_name}</p>
+                                </div>`
+                            ).join('');
+                        }
+                        
+                        $categoriesList.html(html);
+                        
+                        // Initialize parent category toggle functionality (only if parent categories exist)
+                        if (hasCategorizedCategories) {
+                            $categoriesList.find('.kab-category-header').on('click', function(e) {
+                                // Don't trigger category selection when clicking parent header
+                                e.stopPropagation();
+                                
+                                const $header = $(this);
+                                const $categories = $header.next('.kab-category-services');
+                                const $toggle = $header.find('.kab-category-toggle');
+                                
+                                // Close all other parent categories
+                                $categoriesList.find('.kab-category-services').not($categories).slideUp(200);
+                                $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
+                                
+                                // Toggle current parent category
+                                $categories.slideToggle(200);
+                                $toggle.text($categories.is(':visible') ? '−' : '+');
+                            });
+                        }
+                    } else {
+                        $categoriesList.html('<div class="kab-no-data">No categories available.</div>');
+                    }
+                },
+                error: function() {
+                    $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                }
+            });
+        }
+        
+        /**
+         * Load locations by category (step 2) - grouped by location categories
+         */
+        loadLocationsByCategory() {
+            const self = this;
+            const $locationsList = this.$form.find('.kab-locations-list');
+            
+            if (!this.categoryId) {
+                $locationsList.html('<div class="kab-no-data">Please select a category first.</div>');
+                return;
+            }
+            
+            $locationsList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_locations_by_category',
+                    category_id: this.categoryId,
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
                     if (response.success && response.data.locations) {
                         // Store locations data
                         self.locations = response.data.locations;
+                        const locationCategories = response.data.categories || [];
                         
-                        // Group locations by category
-                        const categories = response.data.categories || [];
+                        // Group locations by location category
                         const locationsByCategory = {};
                         const uncategorizedLocations = [];
                         
-                        // Initialize categories
-                        categories.forEach(cat => {
+                        // Initialize location categories
+                        locationCategories.forEach(cat => {
                             locationsByCategory[cat.id] = {
                                 category: cat,
                                 locations: []
@@ -394,18 +441,18 @@
                             }
                         });
                         
-                        // Build HTML with category dropdowns
+                        // Build HTML with location category groups
                         let html = '';
                         
                         // Check if we have any categorized locations
                         const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
                         
                         if (hasCategorizedLocations) {
-                            // Render categorized locations in dropdown groups
+                            // Render categorized locations in collapsible groups
                             Object.values(locationsByCategory).forEach(catData => {
                                 if (catData.locations.length > 0) {
                                     html += `<div class="kab-category-group">
-                                        <div class="kab-category-header" data-category-id="${catData.category.id}">
+                                        <div class="kab-category-header" data-location-category-id="${catData.category.id}">
                                             <span class="kab-category-name">${catData.category.category_name}</span>
                                             <span class="kab-category-toggle">+</span>
                                         </div>
@@ -429,7 +476,7 @@
                                 ).join('');
                             }
                         } else {
-                            // No categories, render all locations directly like before
+                            // No location categories, render all locations directly
                             html = self.locations.map(location => 
                                 `<div class="kab-category-item" data-location-id="${location.id}">
                                     <p class="kab-category-name">${location.location_name}</p>
@@ -437,33 +484,33 @@
                             ).join('');
                         }
                         
-                        $categoriesList.html(html);
+                        $locationsList.html(html);
                         
-                        // Initialize category toggle functionality (only if categories exist)
+                        // Initialize location category toggle functionality (only if location categories exist)
                         if (hasCategorizedLocations) {
-                            $categoriesList.find('.kab-category-header').on('click', function() {
+                            $locationsList.find('.kab-category-header').on('click', function(e) {
+                                // Don't trigger location selection when clicking category header
+                                e.stopPropagation();
+                                
                                 const $header = $(this);
                                 const $locations = $header.next('.kab-category-services');
                                 const $toggle = $header.find('.kab-category-toggle');
                                 
-                                // Close all other categories
-                                $categoriesList.find('.kab-category-services').not($locations).slideUp(200);
-                                $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
+                                // Close all other location categories
+                                $locationsList.find('.kab-category-services').not($locations).slideUp(200);
+                                $locationsList.find('.kab-category-toggle').not($toggle).text('+');
                                 
-                                // Toggle current category
+                                // Toggle current location category
                                 $locations.slideToggle(200);
                                 $toggle.text($locations.is(':visible') ? '−' : '+');
                             });
                         }
-                        
-                        // Mark that initial load is complete
-                        self.isInitialLoad = false;
                     } else {
-                        $categoriesList.html('<div class="kab-no-data">No locations available for this service.</div>');
+                        $locationsList.html('<div class="kab-no-data">No locations available for this category.</div>');
                     }
                 },
                 error: function() {
-                    $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                    $locationsList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
         }
@@ -1043,7 +1090,7 @@
         handleStepChange(step) {
             switch (step) {
                 case 2:
-                    this.loadCategories();
+                    this.loadLocationsByCategory();
                     break;
                 case 3:
                     this.loadSpecialists();
@@ -1068,12 +1115,13 @@
             this.serviceId = '';
             this.specialistId = '';
             this.locationId = '';
+            this.categoryId = '';
             this.selectedDate = '';
             this.selectedTime = '';
             
             // Reset UI selections
-            this.$form.find('.kab-service-item').removeClass('selected');
-            this.$form.find('.kab-category-item').removeClass('selected');
+            this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
+            this.$form.find('.kab-category-item[data-location-id]').removeClass('selected');
             this.$form.find('.kab-date-item').removeClass('selected');
             this.$form.find('.kab-time-slot').removeClass('selected');
             
@@ -1084,7 +1132,7 @@
             // Recalculate step mapping
             this.setupStepMapping();
             
-            // Always start at service selection (step 1)
+            // Always start at category selection (step 1)
             let firstLogicalStep = this.getLogicalStep(1);
             
             // Go to the correct initial step
@@ -1092,7 +1140,28 @@
         }
         
         /**
-         * Select a service
+         * Select a category
+         * 
+         * @param {string} categoryId Category ID
+         * @param {boolean} autoAdvance Whether to automatically advance to next step (default: true)
+         */
+        selectCategory(categoryId, autoAdvance = true) {
+            this.categoryId = categoryId;
+            
+            // Update UI
+            this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
+            this.$form.find(`.kab-category-item[data-category-id="${categoryId}"]`).addClass('selected');
+            
+            // Automatically proceed to next step if autoAdvance is true
+            if (autoAdvance) {
+                setTimeout(() => {
+                    this.nextStep();
+                }, 300); // Small delay for visual feedback
+            }
+        }
+        
+        /**
+         * Select a service (used internally when location is selected)
          * 
          * @param {string} serviceId Service ID
          * @param {boolean} autoAdvance Whether to automatically advance to next step (default: true)
@@ -1100,7 +1169,7 @@
         selectService(serviceId, autoAdvance = true) {
             this.serviceId = serviceId;
             
-            // Update UI
+            // Update UI (if service items exist in DOM)
             this.$form.find('.kab-service-item').removeClass('selected');
             this.$form.find(`.kab-service-item[data-service-id="${serviceId}"]`).addClass('selected');
             
@@ -1119,18 +1188,70 @@
          * @param {boolean} autoAdvance Whether to automatically advance to next step
          */
         selectLocation(locationId, autoAdvance = true) {
+            const self = this;
             // Ensure locationId is stored as string for consistency
             this.locationId = String(locationId);
             
-            // Update UI
-            this.$form.find('.kab-category-item').removeClass('selected');
+            // Update UI - locations use kab-category-item class
+            this.$form.find('.kab-category-item[data-location-id]').removeClass('selected');
             this.$form.find(`.kab-category-item[data-location-id="${locationId}"]`).addClass('selected');
             
-            // Automatically proceed to next step if autoAdvance is true
-            if (autoAdvance) {
-                setTimeout(() => {
-                    this.nextStep();
-                }, 300); // Small delay for visual feedback
+            // Auto-select service based on category + location
+            if (this.categoryId) {
+                $.ajax({
+                    url: kab_vars.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'kab_get_service_by_category_location',
+                        category_id: this.categoryId,
+                        location_id: locationId,
+                        nonce: kab_vars.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.service) {
+                            // Store service data
+                            const service = response.data.service;
+                            self.serviceId = service.id;
+                            
+                            // Store service in services array if not already there
+                            const existingService = self.services.find(s => s.id === service.id);
+                            if (!existingService) {
+                                self.services.push(service);
+                            }
+                            
+                            // Automatically proceed to next step if autoAdvance is true
+                            if (autoAdvance) {
+                                setTimeout(() => {
+                                    self.nextStep();
+                                }, 300); // Small delay for visual feedback
+                            }
+                        } else {
+                            // Service not found - show error but still allow to proceed
+                            console.error('Service not found for category and location combination');
+                            if (autoAdvance) {
+                                setTimeout(() => {
+                                    self.nextStep();
+                                }, 300);
+                            }
+                        }
+                    },
+                    error: function() {
+                        // Error getting service - still allow to proceed
+                        console.error('Error getting service by category and location');
+                        if (autoAdvance) {
+                            setTimeout(() => {
+                                self.nextStep();
+                            }, 300);
+                        }
+                    }
+                });
+            } else {
+                // No category selected - just proceed
+                if (autoAdvance) {
+                    setTimeout(() => {
+                        this.nextStep();
+                    }, 300);
+                }
             }
         }
         
@@ -1285,13 +1406,8 @@
             // Get service name
             let serviceName = '';
             if (this.serviceId) {
-                const $selectedService = this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`);
-                if ($selectedService.length) {
-                    // Try p tag first (updated structure), fallback to h4 for backward compatibility
-                    serviceName = $selectedService.find('.kab-service-info p').text();
-                }
-                // If still empty, try to get from stored services data
-                if (!serviceName && this.services.length > 0) {
+                // Try to get from stored services data
+                if (this.services.length > 0) {
                     const selectedService = this.services.find(service => service.id === this.serviceId);
                     if (selectedService && selectedService.name) {
                         serviceName = selectedService.name;
@@ -1311,7 +1427,7 @@
             // Get location name
             let locationName = '';
             if (this.locationId) {
-                // First try to get from DOM
+                // First try to get from DOM - locations use kab-category-item class
                 const $selectedLocation = this.$form.find(`.kab-category-item[data-location-id="${this.locationId}"]`);
                 if ($selectedLocation.length) {
                     locationName = $selectedLocation.find('.kab-category-name').text().trim();
@@ -1329,8 +1445,8 @@
                     }
                 }
                 
-                // If still empty and we have locationId, try to load locations if not already loaded
-                if (!locationName && this.locations.length === 0 && this.serviceId) {
+                // If still empty and we have categoryId, try to load locations if not already loaded
+                if (!locationName && this.locations.length === 0 && this.categoryId) {
                     // Load locations synchronously for summary
                     const self = this;
                     $.ajax({
@@ -1338,8 +1454,8 @@
                         type: 'POST',
                         async: false, // Synchronous to get the data immediately
                         data: {
-                            action: 'kab_get_locations',
-                            service_id: this.serviceId,
+                            action: 'kab_get_locations_by_category',
+                            category_id: this.categoryId,
                             nonce: kab_vars.nonce
                         },
                         success: function(response) {

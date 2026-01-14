@@ -9,6 +9,33 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * AJAX handler for getting service categories
+ */
+function kab_get_categories_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Get all service categories
+    $categories = kab_get_service_categories();
+    
+    // Get all parent categories
+    $parent_categories = kab_get_service_parent_categories();
+    
+    if (!empty($categories)) {
+        wp_send_json_success(array(
+            'categories' => $categories,
+            'parent_categories' => $parent_categories
+        ));
+    } else {
+        wp_send_json_error(array('message' => __('No categories available.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_categories', 'kab_get_categories_ajax');
+add_action('wp_ajax_nopriv_kab_get_categories', 'kab_get_categories_ajax');
+
+/**
  * AJAX handler for getting services
  */
 function kab_get_services() {
@@ -46,7 +73,98 @@ add_action('wp_ajax_kab_get_services', 'kab_get_services');
 add_action('wp_ajax_nopriv_kab_get_services', 'kab_get_services');
 
 /**
- * AJAX handler for getting locations
+ * AJAX handler for getting locations by category
+ */
+function kab_get_locations_by_category_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['category_id']) || empty($_POST['category_id'])) {
+        wp_send_json_error(array('message' => __('Category ID is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $category_id = intval($_POST['category_id']);
+    
+    // Get locations by category
+    $locations = kab_get_locations_by_category($category_id);
+    
+    // Get all location categories for grouping
+    $location_categories = kab_get_location_categories();
+    
+    // Add category_id to each location
+    foreach ($locations as &$location) {
+        $location->category_id = kab_get_location_category_id($location->id);
+    }
+    
+    if (!empty($locations)) {
+        wp_send_json_success(array(
+            'locations' => $locations,
+            'categories' => $location_categories
+        ));
+    } else {
+        wp_send_json_error(array('message' => __('No locations available for this category.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
+add_action('wp_ajax_nopriv_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
+
+/**
+ * AJAX handler for getting service by category and location
+ */
+function kab_get_service_by_category_location_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['category_id']) || empty($_POST['category_id']) ||
+        !isset($_POST['location_id']) || empty($_POST['location_id'])) {
+        wp_send_json_error(array('message' => __('Category ID and Location ID are required.', 'konfidens-appointment-booking')));
+    }
+    
+    $category_id = intval($_POST['category_id']);
+    $location_id = intval($_POST['location_id']);
+    
+    // Get service by category and location
+    $service_id = kab_get_service_by_category_location($category_id, $location_id);
+    
+    if (!empty($service_id)) {
+        // Get all services with price information (same format as kab_get_services)
+        $all_services = kab_get_services_with_priority();
+        
+        // Find the service in the list
+        $service = null;
+        foreach ($all_services as $s) {
+            if ($s['id'] === $service_id) {
+                $service = $s;
+                break;
+            }
+        }
+        
+        if ($service) {
+            wp_send_json_success(array('service' => $service));
+        } else {
+            // Fallback: try kab_get_service_by_id
+            $service = kab_get_service_by_id($service_id);
+            if ($service && !empty($service)) {
+                wp_send_json_success(array('service' => $service));
+            } else {
+                wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
+            }
+        }
+    } else {
+        wp_send_json_error(array('message' => __('No service available for this category and location combination.', 'konfidens-appointment-booking')));
+    }
+}
+add_action('wp_ajax_kab_get_service_by_category_location', 'kab_get_service_by_category_location_ajax');
+add_action('wp_ajax_nopriv_kab_get_service_by_category_location', 'kab_get_service_by_category_location_ajax');
+
+/**
+ * AJAX handler for getting locations (kept for backward compatibility)
  */
 function kab_get_locations_ajax() {
     // Check nonce
@@ -61,18 +179,15 @@ function kab_get_locations_ajax() {
     
     $service_id = sanitize_text_field($_POST['service_id']);
     
-    // Get service locations
-    $service_location_ids = kab_get_service_locations($service_id);
+    // Get service location (single location only)
+    $service_location_id = kab_get_service_locations($service_id);
     
-    if (!empty($service_location_ids)) {
+    if (!empty($service_location_id)) {
         $locations = array();
+        $location = kab_get_location_by_id($service_location_id);
         
-        foreach ($service_location_ids as $location_id) {
-            $location = kab_get_location_by_id($location_id);
-            
-            if ($location) {
-                $locations[] = $location;
-            }
+        if ($location) {
+            $locations[] = $location;
         }
         
         if (!empty($locations)) {
@@ -206,10 +321,9 @@ function kab_get_all_therapists_ajax() {
                 $therapist['stored_tags'] = $stored_tags;
             }
             
-            // Check if therapist has locations assigned
-            $therapist_locations = kab_get_specialist_locations($therapist['id']);
-            $therapist['has_locations'] = !empty($therapist_locations);
-            $therapist['location_ids'] = $therapist_locations;
+            // Location assignment removed - therapists no longer have location restrictions
+            $therapist['has_locations'] = true;
+            $therapist['location_ids'] = array();
             
             $therapists_array[] = $therapist;
         }
@@ -333,6 +447,136 @@ add_action('wp_ajax_kab_get_services_for_therapist', 'kab_get_services_for_thera
 add_action('wp_ajax_nopriv_kab_get_services_for_therapist', 'kab_get_services_for_therapist_ajax');
 
 /**
+ * AJAX handler for getting categories for a specific therapist
+ * Only returns categories that are assigned to services available for the therapist
+ */
+function kab_get_categories_for_therapist_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
+        wp_send_json_error(array('message' => __('Therapist ID is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $therapist_id = sanitize_text_field($_POST['therapist_id']);
+    
+    // Get all services
+    $all_services = kab_get_services_with_priority();
+    
+    if (empty($all_services)) {
+        wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
+        return;
+    }
+    
+    // Get therapists for each service to find which services belong to this therapist
+    $therapist_service_ids = array();
+    
+    foreach ($all_services as $service) {
+        $service_id = $service['id'];
+        $service_therapists = kab_get_therapists_for_service($service_id);
+        
+        foreach ($service_therapists as $therapist) {
+            if ($therapist['id'] === $therapist_id) {
+                $therapist_service_ids[] = $service_id;
+                break;
+            }
+        }
+    }
+    
+    if (empty($therapist_service_ids)) {
+        wp_send_json_success(array(
+            'categories' => array(),
+            'parent_categories' => array()
+        ));
+        return;
+    }
+    
+    // Get unique category IDs from therapist's services
+    global $wpdb;
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
+    
+    $category_ids = array();
+    foreach ($therapist_service_ids as $service_id) {
+        $service_location = $wpdb->get_row($wpdb->prepare(
+            "SELECT category_id FROM $location_service_table WHERE service_id = %s AND category_id IS NOT NULL",
+            $service_id
+        ));
+        
+        if ($service_location && $service_location->category_id) {
+            $cat_id = intval($service_location->category_id);
+            if (!in_array($cat_id, $category_ids)) {
+                $category_ids[] = $cat_id;
+            }
+        }
+    }
+    
+    if (empty($category_ids)) {
+        wp_send_json_success(array(
+            'categories' => array(),
+            'parent_categories' => array()
+        ));
+        return;
+    }
+    
+    // Get categories
+    $category_table = $wpdb->prefix . 'kab_service_category';
+    $category_ids_str = implode(',', array_map('intval', $category_ids));
+    $categories = $wpdb->get_results(
+        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY category_name ASC"
+    );
+    
+    // Get parent categories for these categories
+    $parent_category_ids = array();
+    foreach ($categories as $category) {
+        if ($category->parent_category_id && !in_array($category->parent_category_id, $parent_category_ids)) {
+            $parent_category_ids[] = $category->parent_category_id;
+        }
+    }
+    
+    $parent_categories = array();
+    if (!empty($parent_category_ids)) {
+        $parent_category_table = $wpdb->prefix . 'kab_service_parent_category';
+        $parent_ids_str = implode(',', array_map('intval', $parent_category_ids));
+        $parent_categories = $wpdb->get_results(
+            "SELECT * FROM $parent_category_table WHERE id IN ($parent_ids_str) ORDER BY parent_category_name ASC"
+        );
+    }
+    
+    wp_send_json_success(array(
+        'categories' => $categories,
+        'parent_categories' => $parent_categories
+    ));
+}
+add_action('wp_ajax_kab_get_categories_for_therapist', 'kab_get_categories_for_therapist_ajax');
+add_action('wp_ajax_nopriv_kab_get_categories_for_therapist', 'kab_get_categories_for_therapist_ajax');
+
+/**
+ * AJAX handler for getting specialist locations
+ * Note: Location assignment removed - returns empty array for backward compatibility
+ */
+function kab_get_specialist_locations_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['specialist_id']) || empty($_POST['specialist_id'])) {
+        wp_send_json_error(array('message' => __('Specialist ID is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $specialist_id = sanitize_text_field($_POST['specialist_id']);
+    
+    // Location assignment removed - return empty array (no location restrictions)
+    wp_send_json_success(array('location_ids' => array()));
+}
+add_action('wp_ajax_kab_get_specialist_locations', 'kab_get_specialist_locations_ajax');
+add_action('wp_ajax_nopriv_kab_get_specialist_locations', 'kab_get_specialist_locations_ajax');
+
+/**
  * AJAX handler for getting locations for a specific therapist and service
  */
 function kab_get_locations_for_therapist_service_ajax() {
@@ -350,24 +594,15 @@ function kab_get_locations_for_therapist_service_ajax() {
     $service_id = sanitize_text_field($_POST['service_id']);
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
     
-    // Get service locations
-    $service_location_ids = kab_get_service_locations($service_id);
+    // Get service location (single location only, therapist location filtering removed)
+    $service_location_id = kab_get_service_locations($service_id);
     
-    // Get therapist locations
-    $therapist_location_ids = kab_get_specialist_locations($therapist_id);
-    
-    // Find intersection - locations that are available for both service and therapist
-    $available_location_ids = array_intersect($service_location_ids, $therapist_location_ids);
-    
-    if (!empty($available_location_ids)) {
+    if (!empty($service_location_id)) {
         $locations = array();
+        $location = kab_get_location_by_id($service_location_id);
         
-        foreach ($available_location_ids as $location_id) {
-            $location = kab_get_location_by_id($location_id);
-            
-            if ($location) {
-                $locations[] = $location;
-            }
+        if ($location) {
+            $locations[] = $location;
         }
         
         if (!empty($locations)) {
@@ -384,10 +619,10 @@ function kab_get_locations_for_therapist_service_ajax() {
                 'categories' => $categories
             ));
         } else {
-            wp_send_json_error(array('message' => __('No locations available for this therapist and service combination.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
         }
     } else {
-        wp_send_json_error(array('message' => __('No locations available for this therapist and service combination.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_locations_for_therapist_service', 'kab_get_locations_for_therapist_service_ajax');

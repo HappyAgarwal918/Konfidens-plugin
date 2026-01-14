@@ -24,6 +24,7 @@
             this.preselectedTherapistId = $form.data('therapist-id') || '';
             this.serviceId = '';
             this.locationId = '';
+            this.categoryId = ''; // Store selected category ID
             this.selectedDate = '';
             this.selectedTime = '';
             this.services = [];
@@ -32,9 +33,9 @@
             this.allTherapists = []; // Store all therapists for selection step
             
             // Track pending AJAX requests to prevent race conditions
-            this.pendingServicesRequest = null;
-            this.loadingServicesForTherapistId = null;
-            this.isLoadingServices = false;
+            this.pendingCategoriesRequest = null;
+            this.loadingCategoriesForTherapistId = null;
+            this.isLoadingCategories = false;
             
             this.init();
         }
@@ -57,7 +58,7 @@
             
             // Load data in background
             this.loadTherapist();
-            this.loadServices();
+            this.loadCategories();
         }
         
         /**
@@ -66,23 +67,14 @@
         initEvents() {
             const self = this;
             
-            // Service selection - only allow if services are loaded
-            this.$form.on('click', '.kab-service-item', function() {
-                // Prevent selection while loading
-                if (self.isLoadingServices) {
-                    return;
-                }
-                
-                const serviceId = $(this).data('service-id');
-                // Verify service belongs to current therapist
-                const service = self.services.find(s => s.id === serviceId);
-                if (service) {
-                    self.selectService(serviceId);
-                }
+            // Category selection (step 1) - categories use kab-category-item class
+            this.$form.on('click', '.kab-category-item[data-category-id]', function() {
+                const categoryId = $(this).data('category-id');
+                self.selectCategory(categoryId);
             });
             
-            // Category selection
-            this.$form.on('click', '.kab-category-item', function() {
+            // Location selection (step 2) - locations use kab-category-item class
+            this.$form.on('click', '.kab-category-item[data-location-id]', function() {
                 const locationId = $(this).data('location-id');
                 self.selectLocation(locationId);
             });
@@ -269,90 +261,156 @@
         }
         
         /**
-         * Load services for the therapist
+         * Load categories for the therapist (step 1) - grouped by parent categories
          */
-        loadServices() {
+        loadCategories() {
             const self = this;
-            const $servicesList = this.$form.find('.kab-services-list');
+            const $categoriesList = this.$form.find('.kab-categories-list');
             
             // Cancel any pending request
-            if (this.pendingServicesRequest) {
-                this.pendingServicesRequest.abort();
-                this.pendingServicesRequest = null;
+            if (this.pendingCategoriesRequest) {
+                this.pendingCategoriesRequest.abort();
+                this.pendingCategoriesRequest = null;
             }
             
-            // Store which therapist we're loading services for
+            // Store which therapist we're loading categories for
             const loadingForTherapistId = this.therapistId;
-            this.loadingServicesForTherapistId = loadingForTherapistId;
-            this.isLoadingServices = true;
+            this.loadingCategoriesForTherapistId = loadingForTherapistId;
+            this.isLoadingCategories = true;
             
-            // Clear old services immediately and show loading
-            $servicesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            // Clear old categories immediately and show loading
+            $categoriesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             
-            // Disable service selection while loading (add visual indicator)
-            $servicesList.addClass('kab-loading-services');
-            
-            // Clear current service selection
+            // Clear current category selection
+            this.categoryId = '';
             this.serviceId = '';
-            this.services = [];
             
-            this.pendingServicesRequest = $.ajax({
+            this.pendingCategoriesRequest = $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'kab_get_services_for_therapist',
+                    action: 'kab_get_categories_for_therapist',
                     therapist_id: loadingForTherapistId,
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
                     // Only process if this response is for the current therapist
-                    if (self.loadingServicesForTherapistId !== loadingForTherapistId) {
+                    if (self.loadingCategoriesForTherapistId !== loadingForTherapistId) {
                         return; // Ignore stale response
                     }
                     
                     // Clear the pending request reference
-                    self.pendingServicesRequest = null;
-                    self.isLoadingServices = false;
-                    self.loadingServicesForTherapistId = null;
+                    self.pendingCategoriesRequest = null;
+                    self.isLoadingCategories = false;
+                    self.loadingCategoriesForTherapistId = null;
                     
-                    if (response.success && response.data.services) {
-                        // Remove loading indicator
-                        self.$form.find('.kab-services-list').removeClass('kab-loading-services');
+                    if (response.success && response.data.categories) {
+                        const categories = response.data.categories;
+                        const parentCategories = response.data.parent_categories || [];
                         
-                        // Store services data for later use (including prices)
-                        self.services = response.data.services;
+                        // Group categories by parent_category_id
+                        const categoriesByParent = {};
+                        const uncategorizedCategories = [];
                         
-                        // Render all services directly (no category grouping)
-                        const html = self.services.map(service => 
-                            `<div class="kab-service-item" data-service-id="${service.id}">
-                                <div class="kab-service-info">
-                                    <p>${service.name}</p>
-                                </div>
-                            </div>`
-                        ).join('');
+                        // Initialize parent categories
+                        parentCategories.forEach(parentCat => {
+                            categoriesByParent[parentCat.id] = {
+                                parent: parentCat,
+                                categories: []
+                            };
+                        });
                         
-                        $servicesList.html(html);
+                        // Group categories
+                        categories.forEach(category => {
+                            if (category.parent_category_id && categoriesByParent[category.parent_category_id]) {
+                                categoriesByParent[category.parent_category_id].categories.push(category);
+                            } else {
+                                uncategorizedCategories.push(category);
+                            }
+                        });
+                        
+                        // Build HTML with parent category groups
+                        let html = '';
+                        
+                        // Check if we have any categorized categories
+                        const hasCategorizedCategories = Object.values(categoriesByParent).some(parentData => parentData.categories.length > 0);
+                        
+                        if (hasCategorizedCategories) {
+                            // Render categorized categories in collapsible groups
+                            Object.values(categoriesByParent).forEach(parentData => {
+                                if (parentData.categories.length > 0) {
+                                    html += `<div class="kab-category-group">
+                                        <div class="kab-category-header" data-parent-category-id="${parentData.parent.id}">
+                                            <span class="kab-category-name">${parentData.parent.parent_category_name}</span>
+                                            <span class="kab-category-toggle">+</span>
+                                        </div>
+                                        <div class="kab-category-services" style="display: none;">
+                                            ${parentData.categories.map(category => 
+                                                `<div class="kab-category-item" data-category-id="${category.id}">
+                                                    <p class="kab-category-name">${category.category_name}</p>
+                                                </div>`
+                                            ).join('')}
+                                        </div>
+                                    </div>`;
+                                }
+                            });
+                            
+                            // Add uncategorized categories directly (without parent grouping)
+                            if (uncategorizedCategories.length > 0) {
+                                html += uncategorizedCategories.map(category => 
+                                    `<div class="kab-category-item" data-category-id="${category.id}">
+                                        <p class="kab-category-name">${category.category_name}</p>
+                                    </div>`
+                                ).join('');
+                            }
+                        } else {
+                            // No parent categories, render all categories directly
+                            html = categories.map(category => 
+                                `<div class="kab-category-item" data-category-id="${category.id}">
+                                    <p class="kab-category-name">${category.category_name}</p>
+                                </div>`
+                            ).join('');
+                        }
+                        
+                        $categoriesList.html(html);
+                        
+                        // Initialize parent category toggle functionality (only if parent categories exist)
+                        if (hasCategorizedCategories) {
+                            $categoriesList.find('.kab-category-header').on('click', function(e) {
+                                // Don't trigger category selection when clicking parent header
+                                e.stopPropagation();
+                                
+                                const $header = $(this);
+                                const $categories = $header.next('.kab-category-services');
+                                const $toggle = $header.find('.kab-category-toggle');
+                                
+                                // Close all other parent categories
+                                $categoriesList.find('.kab-category-services').not($categories).slideUp(200);
+                                $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
+                                
+                                // Toggle current parent category
+                                $categories.slideToggle(200);
+                                $toggle.text($categories.is(':visible') ? '−' : '+');
+                            });
+                        }
                     } else {
-                        $servicesList.html('<div class="kab-no-data">' + (response.data?.message || kab_vars.no_services) + '</div>');
+                        $categoriesList.html('<div class="kab-no-data">No categories available for this therapist.</div>');
                     }
                 },
                 error: function(xhr, status, error) {
                     // Only process error if this response is for the current therapist
-                    if (self.loadingServicesForTherapistId !== loadingForTherapistId) {
+                    if (self.loadingCategoriesForTherapistId !== loadingForTherapistId) {
                         return; // Ignore stale response
                     }
                     
                     // Clear the pending request reference
-                    self.pendingServicesRequest = null;
-                    self.isLoadingServices = false;
-                    self.loadingServicesForTherapistId = null;
-                    
-                    // Remove loading indicator
-                    self.$form.find('.kab-services-list').removeClass('kab-loading-services');
+                    self.pendingCategoriesRequest = null;
+                    self.isLoadingCategories = false;
+                    self.loadingCategoriesForTherapistId = null;
                     
                     // Don't show error if request was aborted (user changed therapist)
                     if (status !== 'abort') {
-                        $servicesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                        $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                     }
                 }
             });
@@ -376,24 +434,17 @@
                 },
                 success: function(response) {
                     if (response.success && response.data.therapists) {
-                        // Filter therapists to only show those with locations assigned
-                        const therapistsWithLocations = response.data.therapists.filter(function(therapist) {
-                            return therapist.has_locations === true && 
-                                   therapist.location_ids && 
-                                   therapist.location_ids.length > 0;
-                        });
+                        // Location assignment removed - show all therapists
+                        self.allTherapists = response.data.therapists;
                         
-                        // Store filtered therapists
-                        self.allTherapists = therapistsWithLocations;
-                        
-                        if (therapistsWithLocations.length === 0) {
-                            $therapistsList.html('<div class="kab-no-data">No therapists with assigned locations available.</div>');
+                        if (self.allTherapists.length === 0) {
+                            $therapistsList.html('<div class="kab-no-data">No therapists available.</div>');
                             return;
                         }
                         
                         let html = '<div class="kab-therapists-grid">';
                         
-                        $.each(therapistsWithLocations, function(index, therapist) {
+                        $.each(self.allTherapists, function(index, therapist) {
                             const imageUrl = therapist.image_url || therapist.profile_image || therapist.image || 'https://via.placeholder.com/100';
                             const therapistName = therapist.name || '';
                             const therapistTitle = therapist.title || '';
@@ -440,140 +491,255 @@
             this.therapistId = therapistId;
             this.$form.attr('data-therapist-id', therapistId);
             
-            // Reset service selection immediately
+            // Reset selections immediately
             this.serviceId = '';
             this.locationId = '';
+            this.categoryId = '';
             this.selectedDate = '';
             this.selectedTime = '';
             this.services = [];
             
-            // Clear any selected service UI
-            this.$form.find('.kab-service-item').removeClass('selected');
+            // Clear any selected UI
+            this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
             
             // Reload therapist info
             this.loadTherapist();
             
-            // Reload services for the new therapist (will cancel any pending request)
-            this.loadServices();
+            // Reload categories for the new therapist (will cancel any pending request)
+            this.loadCategories();
             
             // Go back to step 1
             this.goToStep(1);
         }
         
         /**
-         * Load locations for therapist and service
+         * Select a category
          */
-        loadCategories() {
-            const self = this;
-            const $categoriesList = this.$form.find('.kab-categories-list');
+        selectCategory(categoryId, autoAdvance = true) {
+            this.categoryId = categoryId;
             
-            $categoriesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
+            // Update UI
+            this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
+            this.$form.find(`.kab-category-item[data-category-id="${categoryId}"]`).addClass('selected');
+            
+            // Automatically proceed to next step if autoAdvance is true
+            if (autoAdvance) {
+                setTimeout(() => {
+                    this.nextStep();
+                }, 300); // Small delay for visual feedback
+            }
+        }
+        
+        /**
+         * Load locations by category (step 2) - grouped by location categories
+         */
+        loadLocationsByCategory() {
+            const self = this;
+            const $locationsList = this.$form.find('.kab-locations-list');
+            
+            if (!this.categoryId) {
+                $locationsList.html('<div class="kab-no-data">Please select a category first.</div>');
+                return;
+            }
+            
+            $locationsList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             
             $.ajax({
                 url: kab_vars.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'kab_get_locations_for_therapist_service',
-                    service_id: this.serviceId,
-                    therapist_id: this.therapistId,
+                    action: 'kab_get_locations_by_category',
+                    category_id: this.categoryId,
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
                     if (response.success && response.data.locations) {
                         // Store locations data
                         self.locations = response.data.locations;
+                        const locationCategories = response.data.categories || [];
                         
-                        // Group locations by category
-                        const categories = response.data.categories || [];
-                        const locationsByCategory = {};
-                        const uncategorizedLocations = [];
+                        // Location assignment removed - use all locations for the service
+                        const availableLocations = self.locations;
                         
-                        // Initialize categories
-                        categories.forEach(cat => {
-                            locationsByCategory[cat.id] = {
-                                category: cat,
-                                locations: []
-                            };
-                        });
+                        if (availableLocations.length === 0) {
+                            $locationsList.html('<div class="kab-no-data">No locations available for this category combination.</div>');
+                            return;
+                        }
                         
-                        // Group locations
-                        self.locations.forEach(location => {
-                            if (location.category_id && locationsByCategory[location.category_id]) {
-                                locationsByCategory[location.category_id].locations.push(location);
-                            } else {
-                                uncategorizedLocations.push(location);
-                            }
-                        });
-                        
-                        // Build HTML with category dropdowns
-                        let html = '';
-                        
-                        // Check if we have any categorized locations
-                        const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
-                        
-                        if (hasCategorizedLocations) {
-                            // Render categorized locations in dropdown groups
-                            Object.values(locationsByCategory).forEach(catData => {
-                                if (catData.locations.length > 0) {
-                                    html += `<div class="kab-category-group">
-                                        <div class="kab-category-header" data-category-id="${catData.category.id}">
-                                            <span class="kab-category-name">${catData.category.category_name}</span>
-                                            <span class="kab-category-toggle">+</span>
-                                        </div>
-                                        <div class="kab-category-services" style="display: none;">
-                                            ${catData.locations.map(location => 
-                                                `<div class="kab-category-item" data-location-id="${location.id}">
-                                                    <p class="kab-category-name">${location.location_name}</p>
-                                                </div>`
-                                            ).join('')}
-                                        </div>
-                                    </div>`;
+                        // Group locations by location category
+                                const locationsByCategory = {};
+                                const uncategorizedLocations = [];
+                                
+                                // Initialize location categories
+                                locationCategories.forEach(cat => {
+                                    locationsByCategory[cat.id] = {
+                                        category: cat,
+                                        locations: []
+                                    };
+                                });
+                                
+                                // Group locations
+                                availableLocations.forEach(location => {
+                                    if (location.category_id && locationsByCategory[location.category_id]) {
+                                        locationsByCategory[location.category_id].locations.push(location);
+                                    } else {
+                                        uncategorizedLocations.push(location);
+                                    }
+                                });
+                                
+                                // Build HTML with location category groups
+                                let html = '';
+                                
+                                // Check if we have any categorized locations
+                                const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
+                                
+                                if (hasCategorizedLocations) {
+                                    // Render categorized locations in collapsible groups
+                                    Object.values(locationsByCategory).forEach(catData => {
+                                        if (catData.locations.length > 0) {
+                                            html += `<div class="kab-category-group">
+                                                <div class="kab-category-header" data-location-category-id="${catData.category.id}">
+                                                    <span class="kab-category-name">${catData.category.category_name}</span>
+                                                    <span class="kab-category-toggle">+</span>
+                                                </div>
+                                                <div class="kab-category-services" style="display: none;">
+                                                    ${catData.locations.map(location => 
+                                                        `<div class="kab-category-item" data-location-id="${location.id}">
+                                                            <p class="kab-category-name">${location.location_name}</p>
+                                                        </div>`
+                                                    ).join('')}
+                                                </div>
+                                            </div>`;
+                                        }
+                                    });
+                                    
+                                    // Add uncategorized locations directly (without category grouping)
+                                    if (uncategorizedLocations.length > 0) {
+                                        html += uncategorizedLocations.map(location => 
+                                            `<div class="kab-category-item" data-location-id="${location.id}">
+                                                <p class="kab-category-name">${location.location_name}</p>
+                                            </div>`
+                                        ).join('');
+                                    }
+                                } else {
+                                    // No location categories, render all locations directly
+                                    html = availableLocations.map(location => 
+                                        `<div class="kab-category-item" data-location-id="${location.id}">
+                                            <p class="kab-category-name">${location.location_name}</p>
+                                        </div>`
+                                    ).join('');
                                 }
-                            });
-                            
-                            // Add uncategorized locations directly (without category grouping)
-                            if (uncategorizedLocations.length > 0) {
-                                html += uncategorizedLocations.map(location => 
-                                    `<div class="kab-category-item" data-location-id="${location.id}">
-                                        <p class="kab-category-name">${location.location_name}</p>
-                                    </div>`
-                                ).join('');
-                            }
-                        } else {
-                            // No categories, render all locations directly like before
-                            html = self.locations.map(location => 
-                                `<div class="kab-category-item" data-location-id="${location.id}">
-                                    <p class="kab-category-name">${location.location_name}</p>
-                                </div>`
-                            ).join('');
-                        }
-                        
-                        $categoriesList.html(html);
-                        
-                        // Initialize category toggle functionality (only if categories exist)
-                        if (hasCategorizedLocations) {
-                            $categoriesList.find('.kab-category-header').on('click', function() {
-                                const $header = $(this);
-                                const $locations = $header.next('.kab-category-services');
-                                const $toggle = $header.find('.kab-category-toggle');
                                 
-                                // Close all other categories
-                                $categoriesList.find('.kab-category-services').not($locations).slideUp(200);
-                                $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
+                                $locationsList.html(html);
                                 
-                                // Toggle current category
-                                $locations.slideToggle(200);
-                                $toggle.text($locations.is(':visible') ? '−' : '+');
-                            });
-                        }
+                                // Initialize location category toggle functionality (only if location categories exist)
+                                if (hasCategorizedLocations) {
+                                    $locationsList.find('.kab-category-header').on('click', function(e) {
+                                        // Don't trigger location selection when clicking category header
+                                        e.stopPropagation();
+                                        
+                                        const $header = $(this);
+                                        const $locations = $header.next('.kab-category-services');
+                                        const $toggle = $header.find('.kab-category-toggle');
+                                        
+                                        // Close all other location categories
+                                        $locationsList.find('.kab-category-services').not($locations).slideUp(200);
+                                        $locationsList.find('.kab-category-toggle').not($toggle).text('+');
+                                        
+                                        // Toggle current location category
+                                        $locations.slideToggle(200);
+                                        $toggle.text($locations.is(':visible') ? '−' : '+');
+                                    });
+                                }
                     } else {
-                        $categoriesList.html('<div class="kab-no-data">' + (response.data?.message || 'No locations available for this therapist and service combination.') + '</div>');
+                        $locationsList.html('<div class="kab-no-data">No locations available for this category.</div>');
                     }
                 },
                 error: function() {
-                    $categoriesList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
+                    $locationsList.html('<div class="kab-no-data">' + kab_vars.error + '</div>');
                 }
             });
+        }
+        
+        /**
+         * Render locations HTML (helper function)
+         */
+        renderLocations(locations, locationCategories, $container) {
+            const self = this;
+            
+            // Group locations by location category
+            const locationsByCategory = {};
+            const uncategorizedLocations = [];
+            
+            // Initialize location categories
+            locationCategories.forEach(cat => {
+                locationsByCategory[cat.id] = {
+                    category: cat,
+                    locations: []
+                };
+            });
+            
+            // Group locations
+            locations.forEach(location => {
+                if (location.category_id && locationsByCategory[location.category_id]) {
+                    locationsByCategory[location.category_id].locations.push(location);
+                } else {
+                    uncategorizedLocations.push(location);
+                }
+            });
+            
+            // Build HTML
+            let html = '';
+            const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
+            
+            if (hasCategorizedLocations) {
+                Object.values(locationsByCategory).forEach(catData => {
+                    if (catData.locations.length > 0) {
+                        html += `<div class="kab-category-group">
+                            <div class="kab-category-header" data-location-category-id="${catData.category.id}">
+                                <span class="kab-category-name">${catData.category.category_name}</span>
+                                <span class="kab-category-toggle">+</span>
+                            </div>
+                            <div class="kab-category-services" style="display: none;">
+                                ${catData.locations.map(location => 
+                                    `<div class="kab-category-item" data-location-id="${location.id}">
+                                        <p class="kab-category-name">${location.location_name}</p>
+                                    </div>`
+                                ).join('')}
+                            </div>
+                        </div>`;
+                    }
+                });
+                
+                if (uncategorizedLocations.length > 0) {
+                    html += uncategorizedLocations.map(location => 
+                        `<div class="kab-category-item" data-location-id="${location.id}">
+                            <p class="kab-category-name">${location.location_name}</p>
+                        </div>`
+                    ).join('');
+                }
+            } else {
+                html = locations.map(location => 
+                    `<div class="kab-category-item" data-location-id="${location.id}">
+                        <p class="kab-category-name">${location.location_name}</p>
+                    </div>`
+                ).join('');
+            }
+            
+            $container.html(html);
+            
+            if (hasCategorizedLocations) {
+                $container.find('.kab-category-header').on('click', function(e) {
+                    e.stopPropagation();
+                    const $header = $(this);
+                    const $locations = $header.next('.kab-category-services');
+                    const $toggle = $header.find('.kab-category-toggle');
+                    $container.find('.kab-category-services').not($locations).slideUp(200);
+                    $container.find('.kab-category-toggle').not($toggle).text('+');
+                    $locations.slideToggle(200);
+                    $toggle.text($locations.is(':visible') ? '−' : '+');
+                });
+            }
         }
         
         /**
@@ -801,7 +967,7 @@
                     this.loadAllTherapists();
                     break;
                 case 2:
-                    this.loadCategories();
+                    this.loadLocationsByCategory();
                     break;
                 case 3:
                     this.loadDatePicker();
@@ -851,20 +1017,72 @@
         /**
          * Select a location
          */
-        selectLocation(locationId) {
-            this.locationId = locationId;
+        selectLocation(locationId, autoAdvance = true) {
+            const self = this;
+            // Ensure locationId is stored as string for consistency
+            this.locationId = String(locationId);
             
-            // Update UI
-            this.$form.find('.kab-category-item').removeClass('selected');
+            // Update UI - locations use kab-category-item class
+            this.$form.find('.kab-category-item[data-location-id]').removeClass('selected');
             this.$form.find(`.kab-category-item[data-location-id="${locationId}"]`).addClass('selected');
             
-            // Enable next button
-            this.$form.find('.kab-form-step[data-step="2"] .kab-next-btn').prop('disabled', false);
-            
-            // Automatically proceed to next step
-            setTimeout(() => {
-                this.nextStep();
-            }, 300);
+            // Auto-select service based on category + location
+            if (this.categoryId) {
+                $.ajax({
+                    url: kab_vars.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'kab_get_service_by_category_location',
+                        category_id: this.categoryId,
+                        location_id: locationId,
+                        nonce: kab_vars.nonce
+                    },
+                    success: function(response) {
+                        if (response.success && response.data.service) {
+                            // Store service data
+                            const service = response.data.service;
+                            self.serviceId = service.id;
+                            
+                            // Store service in services array if not already there
+                            const existingService = self.services.find(s => s.id === service.id);
+                            if (!existingService) {
+                                self.services.push(service);
+                            }
+                            
+                            // Automatically proceed to next step if autoAdvance is true
+                            if (autoAdvance) {
+                                setTimeout(() => {
+                                    self.nextStep();
+                                }, 300); // Small delay for visual feedback
+                            }
+                        } else {
+                            // Service not found - show error but still allow to proceed
+                            console.error('Service not found for category and location combination');
+                            if (autoAdvance) {
+                                setTimeout(() => {
+                                    self.nextStep();
+                                }, 300);
+                            }
+                        }
+                    },
+                    error: function() {
+                        // Error getting service - still allow to proceed
+                        console.error('Error getting service by category and location');
+                        if (autoAdvance) {
+                            setTimeout(() => {
+                                self.nextStep();
+                            }, 300);
+                        }
+                    }
+                });
+            } else {
+                // No category selected - just proceed
+                if (autoAdvance) {
+                    setTimeout(() => {
+                        this.nextStep();
+                    }, 300);
+                }
+            }
         }
         
         /**
@@ -941,20 +1159,12 @@
          * Update booking summary
          */
         updateBookingSummary() {
-            // Get service name
+            // Get service name - service is auto-selected, so get from stored services data
             let serviceName = '';
-            if (this.serviceId) {
-                const $selectedService = this.$form.find(`.kab-service-item[data-service-id="${this.serviceId}"]`);
-                if ($selectedService.length) {
-                    // Try p tag first (updated structure), fallback to h4 for backward compatibility
-                    serviceName = $selectedService.find('.kab-service-info p').text();
-                }
-                // If still empty, try to get from stored services data
-                if (!serviceName && this.services.length > 0) {
-                    const selectedService = this.services.find(service => service.id === this.serviceId);
-                    if (selectedService && selectedService.name) {
-                        serviceName = selectedService.name;
-                    }
+            if (this.serviceId && this.services.length > 0) {
+                const selectedService = this.services.find(service => service.id === this.serviceId);
+                if (selectedService && selectedService.name) {
+                    serviceName = selectedService.name;
                 }
             }
             
@@ -1051,11 +1261,13 @@
             
             this.serviceId = '';
             this.locationId = '';
+            this.categoryId = '';
             this.selectedDate = '';
             this.selectedTime = '';
             
             // Reset UI selections
-            this.$form.find('.kab-category-item').removeClass('selected');
+            this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
+            this.$form.find('.kab-category-item[data-location-id]').removeClass('selected');
             this.$form.find('.kab-date-item').removeClass('selected');
             this.$form.find('.kab-time-slot').removeClass('selected');
             
@@ -1075,9 +1287,9 @@
             // Go back to step 1
             this.goToStep(1);
             
-            // Reload services for the therapist (will use therapistId from data attribute)
+            // Reload categories for the therapist (will use therapistId from data attribute)
             if (this.therapistId) {
-                this.loadServices();
+                this.loadCategories();
                 // Also reload therapist info to show correct therapist card
                 this.loadTherapist();
             }

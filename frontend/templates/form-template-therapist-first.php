@@ -47,17 +47,17 @@ $form_classes[] = 'kab-context-' . $context;
             </div>
         </div>
         
-        <!-- Step 1: Service Selection (with therapist card) -->
+        <!-- Step 1: Category Selection (with therapist card) -->
         <div class="kab-form-step" data-step="1">
             <div>
                 <div class="kab-step-header">
-                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg tjeneste">
-                    <h3><?php _e('Velg tjeneste', 'konfidens-appointment-booking'); ?></h3>
+                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg kategori">
+                    <h3><?php _e('Velg kategori', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hva kan vi hjelpe deg med?', 'konfidens-appointment-booking'); ?></p>
                 </div>
                 
-                <div class="kab-services-list">
-                    <div class="kab-loading"><?php _e('Loading services...', 'konfidens-appointment-booking'); ?></div>
+                <div class="kab-categories-list">
+                    <div class="kab-loading"><?php _e('Loading categories...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>
             <!-- Selected Therapist Card -->
@@ -84,7 +84,7 @@ $form_classes[] = 'kab-context-' . $context;
                     <h3><?php _e('Sted for møtet', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hvordan ønsker du å gjennomføre samtalen?', 'konfidens-appointment-booking'); ?></p>
                 </div>
-                <div class="kab-categories-list">
+                <div class="kab-locations-list">
                     <div class="kab-loading"><?php _e('Loading locations...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>    

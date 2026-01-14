@@ -34,12 +34,12 @@
                 $('#service_id').val(serviceId);
                 $('#service_name').val(serviceName);
                 
-                // Set selected locations
+                // Set selected location (single location only - use first if multiple exist)
                 if (locations) {
                     var locationIds = locations.split(',');
-                    $('#location_ids').val(locationIds);
+                    $('#location_id').val(locationIds.length > 0 ? locationIds[0] : '');
                 } else {
-                    $('#location_ids').val([]);
+                    $('#location_id').val('');
                 }
                 
                 $('#kab-edit-service-modal').show();
@@ -50,12 +50,12 @@
                 e.preventDefault();
                 
                 var serviceId = $('#service_id').val();
-                var locationIds = $('#location_ids').val();
+                var locationId = $('#location_id').val();
                 
                 var data = {
                     'action': 'kab_update_service_locations',
                     'service_id': serviceId,
-                    'location_ids': locationIds ? locationIds.join(',') : '',
+                    'location_id': locationId || '',
                     'nonce': kab_admin_vars.nonce
                 };
                 
@@ -167,52 +167,6 @@
             });
         }
 
-        // Mapping page functionality
-        if ($('.kab-admin').hasClass('kab-mapping-page')) {
-            // Edit mapping button click
-            $('.kab-edit-mapping').click(function() {
-                var specialistId = $(this).data('specialist-id');
-                var specialistName = $(this).data('specialist-name');
-                var locations = $(this).data('locations').toString();
-                
-                $('#specialist_id').val(specialistId);
-                $('#specialist_name').val(specialistName);
-                
-                // Set selected locations
-                if (locations) {
-                    var locationIds = locations.split(',');
-                    $('#location_ids').val(locationIds);
-                } else {
-                    $('#location_ids').val([]);
-                }
-                
-                $('#kab-edit-mapping-modal').show();
-            });
-            
-            // Submit edit mapping form
-            $('#kab-edit-mapping-form').submit(function(e) {
-                e.preventDefault();
-                
-                var specialistId = $('#specialist_id').val();
-                var locationIds = $('#location_ids').val();
-                
-                var data = {
-                    'action': 'kab_update_specialist_categories',
-                    'specialist_id': specialistId,
-                    'location_ids': locationIds ? locationIds.join(',') : '',
-                    'nonce': kab_admin_vars.nonce
-                };
-                
-                $.post(ajaxurl, data, function(response) {
-                    if (response.success) {
-                        alert(response.data.message);
-                        location.reload();
-                    } else {
-                        alert(response.data.message);
-                    }
-                });
-            });
-        }
 
         // Settings page functionality
         if ($('.kab-admin').hasClass('kab-settings-page')) {

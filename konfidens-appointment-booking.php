@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.1.0');
+define('KAB_VERSION', '1.1.1');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -287,7 +287,7 @@ add_action('init', 'kab_register_shortcodes');
 /**
  * Button shortcode
  * 
- * [su_button]Book Now[/su_button] - Full flow: Service → Location → Therapist → Date & Time → Personal Details
+ * [su_button]Book Now[/su_button] - Full flow: Category → Location → Therapist → Date & Time → Personal Details
  * [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button] - Therapist pre-selected: Therapist → Services → Location → Date & Time → Personal Details
  */
 function kab_button_shortcode($atts, $content = null) {
@@ -296,7 +296,6 @@ function kab_button_shortcode($atts, $content = null) {
             'background' => '',
             'class' => '',
             'id' => '', // specialist_id
-            'set' => '', // Service set name (new preferred method)
         ),
         $atts,
         'su_button'
@@ -328,42 +327,6 @@ function kab_button_shortcode($atts, $content = null) {
         $data_attrs .= ' data-specialist-id="' . esc_attr($atts['id']) . '"';
     }
     
-    // Process service set if provided
-    $service_ids = array();
-    if (!empty($atts['set'])) {
-        // Get service set from options
-        $service_sets = get_option('kab_service_sets', array());
-        $set_id = sanitize_text_field($atts['set']);
-        
-        if (isset($service_sets[$set_id]) && !empty($service_sets[$set_id]['service_ids'])) {
-            $set_service_ids = $service_sets[$set_id]['service_ids'];
-            
-            // Get enabled services to filter out disabled ones
-            $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
-            $enabled_service_ids = array();
-            
-            if ($services_response['success'] && !empty($services_response['data'])) {
-                // Filter only enabled services
-                $enabled_services = array_filter($services_response['data'], function ($service) {
-                    return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
-                });
-                
-                // Create array of enabled service IDs
-                foreach ($enabled_services as $service) {
-                    if (isset($service['id'])) {
-                        $enabled_service_ids[] = $service['id'];
-                    }
-                }
-            }
-            
-            // Filter service set to only include enabled services
-            $service_ids = array_filter($set_service_ids, function($service_id) use ($enabled_service_ids) {
-                return in_array($service_id, $enabled_service_ids);
-            });
-            $service_ids = array_values($service_ids); // Re-index
-        }
-    }
-    
     // Start output buffering
     ob_start();
     
@@ -387,10 +350,9 @@ function kab_button_shortcode($atts, $content = null) {
                     $atts = $therapist_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
                 } else {
-                    // Regular form template: Service → Location → Therapist → Date & Time → Personal Details
+                    // Regular form template: Category → Location → Therapist → Date & Time → Personal Details
                     $form_atts = array(
                         'context' => 'popup',
-                        'service_ids' => $service_ids, // Pass filtered service IDs
                         'popup_id' => $popup_id
                     );
                     $atts = $form_atts;

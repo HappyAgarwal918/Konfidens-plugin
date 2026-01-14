@@ -11,10 +11,6 @@ if (!defined('ABSPATH')) {
 // Get context
 $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 
-// Get service IDs filter (if provided via Service Set)
-$service_ids = isset($atts['service_ids']) && is_array($atts['service_ids']) ? $atts['service_ids'] : array();
-$service_ids_json = json_encode($service_ids);
-
 // Get popup ID for tracking
 $popup_id = isset($atts['popup_id']) ? $atts['popup_id'] : '';
 
@@ -29,8 +25,7 @@ $form_classes[] = 'kab-context-' . $context;
 <div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>"
      id="<?php echo esc_attr($form_unique_id); ?>"
      data-form-id="<?php echo esc_attr($form_unique_id); ?>"
-     <?php echo !empty($popup_id) ? ' data-popup-id="' . esc_attr($popup_id) . '"' : ''; ?>
-     data-service-ids="<?php echo esc_attr($service_ids_json); ?>">
+     <?php echo !empty($popup_id) ? ' data-popup-id="' . esc_attr($popup_id) . '"' : ''; ?>>
     
     <div class="kab-form-progress">
         <div class="kab-progress-text">1/5</div>
@@ -40,16 +35,16 @@ $form_classes[] = 'kab-context-' . $context;
     </div>
     
     <div class="kab-form-steps">
-        <!-- Step 1: Service Selection -->
+        <!-- Step 1: Category Selection -->
         <div class="kab-form-step" data-step="1">
             <div>
                 <div class="kab-step-header">
-                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg tjeneste">
-                    <h3><?php _e('Velg tjeneste', 'konfidens-appointment-booking'); ?></h3>
+                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg kategori">
+                    <h3><?php _e('Velg kategori', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hva kan vi hjelpe deg med?', 'konfidens-appointment-booking'); ?></p>
                 </div>            
-                <div class="kab-services-list">
-                    <div class="kab-loading"><?php _e('Loading services...', 'konfidens-appointment-booking'); ?></div>
+                <div class="kab-categories-list">
+                    <div class="kab-loading"><?php _e('Loading categories...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>
         </div>
@@ -62,7 +57,7 @@ $form_classes[] = 'kab-context-' . $context;
                     <h3><?php _e('Sted for møtet', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hvordan ønsker du å gjennomføre samtalen?', 'konfidens-appointment-booking'); ?></p>
                 </div>
-                <div class="kab-categories-list">
+                <div class="kab-locations-list">
                     <div class="kab-loading"><?php _e('Loading locations...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>

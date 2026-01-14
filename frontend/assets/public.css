@@ -198,21 +198,31 @@
     margin-right: 10px;
 }
 
-/* Categories List */
+/* Categories List - uses same grid layout as services list */
 .kab-categories-list {
     display: grid;
-    grid-template-columns: repeat(1, minmax(250px, 300px));
+    grid-template-columns: repeat(2, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+/* Locations List - uses same grid layout as categories list */
+.kab-locations-list {
+    display: grid;
+    grid-template-columns: repeat(1, max(250px));
     gap: 15px;
     justify-content: center;
 }
-
+.kab-locations-list .kab-category-item {
+    text-align: center;
+}
 .kab-category-item {
     padding: 12px 24px;
     cursor: pointer;
     transition: all 0.3s ease;
-    text-align: center;
     background-color: #e8e5f4;
     border-radius: 8px;
+    position: relative;
+    z-index: 1;
 }
 
 .kab-category-item:hover {
@@ -504,7 +514,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(100px, 1fr));
     gap: 10px;
-    max-height: 260px;
+    max-height: 285px;
     overflow: auto;
 }
 
