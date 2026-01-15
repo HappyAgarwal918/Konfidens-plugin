@@ -9,6 +9,98 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Get service set by ID
+ */
+function kab_get_service_set($set_id) {
+    $service_sets = get_option('kab_service_sets', array());
+    if (isset($service_sets[$set_id])) {
+        return $service_sets[$set_id];
+    }
+    return null;
+}
+
+/**
+ * Get categories filtered by service set
+ */
+function kab_get_categories_by_service_set($set_id) {
+    $service_set = kab_get_service_set($set_id);
+    if (!$service_set || empty($service_set['service_ids'])) {
+        return array();
+    }
+    
+    global $wpdb;
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
+    $category_table = $wpdb->prefix . 'kab_service_category';
+    
+    // Get unique category IDs for services in the set
+    $service_ids = array_map('sanitize_text_field', $service_set['service_ids']);
+    $service_ids_str = "'" . implode("','", $service_ids) . "'";
+    
+    $category_ids = $wpdb->get_col(
+        "SELECT DISTINCT category_id FROM $location_service_table 
+         WHERE service_id IN ($service_ids_str) AND category_id IS NOT NULL"
+    );
+    
+    if (empty($category_ids)) {
+        return array();
+    }
+    
+    $category_ids_str = implode(',', array_map('intval', $category_ids));
+    $categories = $wpdb->get_results(
+        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY category_name ASC"
+    );
+    
+    return $categories;
+}
+
+/**
+ * Get locations filtered by service set
+ */
+function kab_get_locations_by_service_set($set_id) {
+    $service_set = kab_get_service_set($set_id);
+    if (!$service_set || empty($service_set['service_ids'])) {
+        return array();
+    }
+    
+    global $wpdb;
+    $location_service_table = $wpdb->prefix . 'kab_location_service';
+    $location_table = $wpdb->prefix . 'kab_location';
+    
+    // Get unique location IDs for services in the set
+    $service_ids = array_map('sanitize_text_field', $service_set['service_ids']);
+    $service_ids_str = "'" . implode("','", $service_ids) . "'";
+    
+    $location_ids = $wpdb->get_col(
+        "SELECT DISTINCT location_ids FROM $location_service_table 
+         WHERE service_id IN ($service_ids_str) AND location_ids != '' AND location_ids IS NOT NULL"
+    );
+    
+    if (empty($location_ids)) {
+        return array();
+    }
+    
+    // Filter out empty values and get unique IDs
+    $unique_location_ids = array();
+    foreach ($location_ids as $loc_id) {
+        $loc_id = trim($loc_id);
+        if (!empty($loc_id) && !in_array($loc_id, $unique_location_ids)) {
+            $unique_location_ids[] = $loc_id;
+        }
+    }
+    
+    if (empty($unique_location_ids)) {
+        return array();
+    }
+    
+    $location_ids_str = implode(',', array_map('intval', $unique_location_ids));
+    $locations = $wpdb->get_results(
+        "SELECT * FROM $location_table WHERE id IN ($location_ids_str) ORDER BY location_name ASC"
+    );
+    
+    return $locations;
+}
+
+/**
  * AJAX handler for getting service categories
  */
 function kab_get_categories_ajax() {
@@ -17,19 +109,37 @@ function kab_get_categories_ajax() {
         wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
     }
     
-    // Get all service categories
-    $categories = kab_get_service_categories();
+    // Check if service set is provided
+    $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
     
-    // Get all parent categories
-    $parent_categories = kab_get_service_parent_categories();
-    
-    if (!empty($categories)) {
-        wp_send_json_success(array(
-            'categories' => $categories,
-            'parent_categories' => $parent_categories
-        ));
+    if (!empty($service_set_id)) {
+        // Get filtered categories for service set
+        $categories = kab_get_categories_by_service_set($service_set_id);
+        $parent_categories = kab_get_service_parent_categories();
+        
+        if (!empty($categories)) {
+            wp_send_json_success(array(
+                'categories' => $categories,
+                'parent_categories' => $parent_categories
+            ));
+        } else {
+            wp_send_json_error(array('message' => __('No categories available for this service set.', 'konfidens-appointment-booking')));
+        }
     } else {
-        wp_send_json_error(array('message' => __('No categories available.', 'konfidens-appointment-booking')));
+        // Get all service categories
+        $categories = kab_get_service_categories();
+        
+        // Get all parent categories
+        $parent_categories = kab_get_service_parent_categories();
+        
+        if (!empty($categories)) {
+            wp_send_json_success(array(
+                'categories' => $categories,
+                'parent_categories' => $parent_categories
+            ));
+        } else {
+            wp_send_json_error(array('message' => __('No categories available.', 'konfidens-appointment-booking')));
+        }
     }
 }
 add_action('wp_ajax_kab_get_categories', 'kab_get_categories_ajax');
@@ -87,9 +197,28 @@ function kab_get_locations_by_category_ajax() {
     }
     
     $category_id = intval($_POST['category_id']);
+    $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
     
     // Get locations by category
     $locations = kab_get_locations_by_category($category_id);
+    
+    // If service set is provided, filter locations to only those in the set
+    if (!empty($service_set_id)) {
+        $set_locations = kab_get_locations_by_service_set($service_set_id);
+        $set_location_ids = array();
+        foreach ($set_locations as $loc) {
+            $set_location_ids[] = $loc->id;
+        }
+        
+        // Filter locations to only include those in the service set
+        $filtered_locations = array();
+        foreach ($locations as $location) {
+            if (in_array($location->id, $set_location_ids)) {
+                $filtered_locations[] = $location;
+            }
+        }
+        $locations = $filtered_locations;
+    }
     
     // Get all location categories for grouping
     $location_categories = kab_get_location_categories();

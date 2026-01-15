@@ -14,6 +14,9 @@ $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 // Get popup ID for tracking
 $popup_id = isset($atts['popup_id']) ? $atts['popup_id'] : '';
 
+// Get service set ID if provided
+$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : '';
+
 // Generate unique form ID for tracking
 $form_unique_id = 'kab-form-' . uniqid();
 
@@ -25,7 +28,8 @@ $form_classes[] = 'kab-context-' . $context;
 <div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>"
      id="<?php echo esc_attr($form_unique_id); ?>"
      data-form-id="<?php echo esc_attr($form_unique_id); ?>"
-     <?php echo !empty($popup_id) ? ' data-popup-id="' . esc_attr($popup_id) . '"' : ''; ?>>
+     <?php echo !empty($popup_id) ? ' data-popup-id="' . esc_attr($popup_id) . '"' : ''; ?>
+     <?php echo !empty($service_set_id) ? ' data-service-set="' . esc_attr($service_set_id) . '"' : ''; ?>>
     
     <div class="kab-form-progress">
         <div class="kab-progress-text">1/5</div>

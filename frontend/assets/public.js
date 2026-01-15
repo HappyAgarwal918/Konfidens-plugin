@@ -32,6 +32,7 @@
             this.specialists = []; // Store specialists data for random selection
             this.isInitialLoad = true; // Flag to track if this is the initial load
             this.isLoadingSpecialists = false; // Flag to prevent multiple simultaneous specialist loads
+            this.serviceSetId = this.$form.data('service-set') || ''; // Get service set ID from data attribute
             
             // Determine which steps are visible and create step mapping
             this.setupStepMapping();
@@ -290,7 +291,8 @@
                 type: 'POST',
                 data: {
                     action: 'kab_get_categories',
-                    nonce: kab_vars.nonce
+                    nonce: kab_vars.nonce,
+                    service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
                     if (response.success && response.data.categories) {
@@ -412,7 +414,8 @@
                 data: {
                     action: 'kab_get_locations_by_category',
                     category_id: this.categoryId,
-                    nonce: kab_vars.nonce
+                    nonce: kab_vars.nonce,
+                    service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
                     if (response.success && response.data.locations) {

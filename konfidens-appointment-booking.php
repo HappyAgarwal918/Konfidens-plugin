@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.1.1');
+define('KAB_VERSION', '1.1.2');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -289,6 +289,7 @@ add_action('init', 'kab_register_shortcodes');
  * 
  * [su_button]Book Now[/su_button] - Full flow: Category → Location → Therapist → Date & Time → Personal Details
  * [su_button id="SPECIALIST_ID"]Book With This Therapist[/su_button] - Therapist pre-selected: Therapist → Services → Location → Date & Time → Personal Details
+ * [su_button set="SET_ID"]Book Now[/su_button] - Service set pre-selected: Only shows categories and locations for services in the set
  */
 function kab_button_shortcode($atts, $content = null) {
     $atts = shortcode_atts(
@@ -296,6 +297,7 @@ function kab_button_shortcode($atts, $content = null) {
             'background' => '',
             'class' => '',
             'id' => '', // specialist_id
+            'set' => '', // service_set_id
         ),
         $atts,
         'su_button'
@@ -326,6 +328,9 @@ function kab_button_shortcode($atts, $content = null) {
     if (!empty($atts['id'])) {
         $data_attrs .= ' data-specialist-id="' . esc_attr($atts['id']) . '"';
     }
+    if (!empty($atts['set'])) {
+        $data_attrs .= ' data-service-set="' . esc_attr($atts['set']) . '"';
+    }
     
     // Start output buffering
     ob_start();
@@ -353,7 +358,8 @@ function kab_button_shortcode($atts, $content = null) {
                     // Regular form template: Category → Location → Therapist → Date & Time → Personal Details
                     $form_atts = array(
                         'context' => 'popup',
-                        'popup_id' => $popup_id
+                        'popup_id' => $popup_id,
+                        'service_set_id' => !empty($atts['set']) ? $atts['set'] : ''
                     );
                     $atts = $form_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template.php';
