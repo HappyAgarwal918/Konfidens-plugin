@@ -416,6 +416,7 @@ add_action('wp_ajax_nopriv_kab_get_specialists', 'kab_get_specialists_ajax');
 
 /**
  * AJAX handler for getting all therapists (not filtered by service)
+ * Can optionally filter by service set to only show therapists who provide services in the set
  */
 function kab_get_all_therapists_ajax() {
     // Check nonce
@@ -423,8 +424,60 @@ function kab_get_all_therapists_ajax() {
         wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
     }
     
+    // Check if service set is provided
+    $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
+    $service_set_service_ids = array();
+    
+    if (!empty($service_set_id)) {
+        $service_set = kab_get_service_set($service_set_id);
+        if ($service_set && !empty($service_set['service_ids'])) {
+            $service_set_service_ids = $service_set['service_ids'];
+        }
+    }
+    
     // Get all therapists (returns associative array with therapist IDs as keys)
-    $therapists = kab_get_all_therapists();
+    $all_therapists = kab_get_all_therapists();
+    
+    // If service set is provided, filter therapists to only those who provide at least one service in the set
+    $therapists = $all_therapists;
+    if (!empty($service_set_id) && !empty($service_set_service_ids)) {
+        // Get all services
+        $all_services = kab_get_services_with_priority();
+        
+        // Build a map of therapist_id => array of service_ids they provide
+        $therapist_service_map = array();
+        
+        foreach ($all_services as $service) {
+            $service_id = $service['id'];
+            
+            // Only check services that are in the service set
+            if (!in_array($service_id, $service_set_service_ids)) {
+                continue;
+            }
+            
+            // Get therapists for this service
+            $service_therapists = kab_get_therapists_for_service($service_id);
+            
+            foreach ($service_therapists as $therapist) {
+                $tid = $therapist['id'];
+                if (!isset($therapist_service_map[$tid])) {
+                    $therapist_service_map[$tid] = array();
+                }
+                if (!in_array($service_id, $therapist_service_map[$tid])) {
+                    $therapist_service_map[$tid][] = $service_id;
+                }
+            }
+        }
+        
+        // Filter therapists to only those in the map (they provide at least one service from the set)
+        $filtered_therapists = array();
+        foreach ($all_therapists as $therapist_id => $therapist) {
+            if (isset($therapist_service_map[$therapist_id])) {
+                $filtered_therapists[$therapist_id] = $therapist;
+            }
+        }
+        $therapists = $filtered_therapists;
+    }
     
     // Process therapist data to ensure image URLs are properly formatted
     $therapists_array = array();
@@ -461,7 +514,10 @@ function kab_get_all_therapists_ajax() {
     if (!empty($therapists_array)) {
         wp_send_json_success(array('therapists' => $therapists_array));
     } else {
-        wp_send_json_error(array('message' => __('No therapists available.', 'konfidens-appointment-booking')));
+        $error_msg = !empty($service_set_id)
+            ? __('No therapists available for the selected service set.', 'konfidens-appointment-booking')
+            : __('No therapists available.', 'konfidens-appointment-booking');
+        wp_send_json_error(array('message' => $error_msg));
     }
 }
 add_action('wp_ajax_kab_get_all_therapists', 'kab_get_all_therapists_ajax');
@@ -545,16 +601,37 @@ function kab_get_services_for_therapist_ajax() {
     // Get service IDs for this therapist from the reverse map
     $therapist_service_ids = isset($therapist_service_map[$therapist_id]) ? $therapist_service_map[$therapist_id] : array();
     
-    // Filter services that belong to this therapist using the reverse map
+    // Check if service set is provided
+    $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
+    $service_set_service_ids = array();
+    
+    if (!empty($service_set_id)) {
+        $service_set = kab_get_service_set($service_set_id);
+        if ($service_set && !empty($service_set['service_ids'])) {
+            $service_set_service_ids = $service_set['service_ids'];
+        }
+    }
+    
+    // Filter services: must be in therapist's services AND (if service set provided) in service set
     $therapist_services = array();
     
     if (!empty($therapist_service_ids)) {
         // Create a lookup array for faster filtering
         $therapist_service_ids_lookup = array_flip($therapist_service_ids);
         
+        // If service set is provided, also create lookup for service set
+        $service_set_lookup = array();
+        if (!empty($service_set_service_ids)) {
+            $service_set_lookup = array_flip($service_set_service_ids);
+        }
+        
         foreach ($all_services as $service) {
+            // Service must be in therapist's services
             if (isset($therapist_service_ids_lookup[$service['id']])) {
-                $therapist_services[] = $service;
+                // If service set is provided, service must also be in the set
+                if (empty($service_set_id) || isset($service_set_lookup[$service['id']])) {
+                    $therapist_services[] = $service;
+                }
             }
         }
     }
@@ -563,13 +640,18 @@ function kab_get_services_for_therapist_ajax() {
         'services' => $therapist_services
     );
     
-    // Cache the result for 5 minutes
-    set_transient($cache_key, $result, 300);
+    // Cache the result for 5 minutes (but don't cache if service set is used, as it's dynamic)
+    if (empty($service_set_id)) {
+        set_transient($cache_key, $result, 300);
+    }
     
     if (!empty($therapist_services)) {
         wp_send_json_success($result);
     } else {
-        wp_send_json_error(array('message' => __('No services available for this therapist.', 'konfidens-appointment-booking')));
+        $error_msg = !empty($service_set_id) 
+            ? __('No services available for this therapist in the selected service set.', 'konfidens-appointment-booking')
+            : __('No services available for this therapist.', 'konfidens-appointment-booking');
+        wp_send_json_error(array('message' => $error_msg));
     }
 }
 add_action('wp_ajax_kab_get_services_for_therapist', 'kab_get_services_for_therapist_ajax');
@@ -591,6 +673,7 @@ function kab_get_categories_for_therapist_ajax() {
     }
     
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
+    $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
     
     // Get all services
     $all_services = kab_get_services_with_priority();
@@ -600,11 +683,26 @@ function kab_get_categories_for_therapist_ajax() {
         return;
     }
     
+    // Get service set service IDs if provided
+    $service_set_service_ids = array();
+    if (!empty($service_set_id)) {
+        $service_set = kab_get_service_set($service_set_id);
+        if ($service_set && !empty($service_set['service_ids'])) {
+            $service_set_service_ids = $service_set['service_ids'];
+        }
+    }
+    
     // Get therapists for each service to find which services belong to this therapist
     $therapist_service_ids = array();
     
     foreach ($all_services as $service) {
         $service_id = $service['id'];
+        
+        // If service set is provided, skip services not in the set
+        if (!empty($service_set_id) && !empty($service_set_service_ids) && !in_array($service_id, $service_set_service_ids)) {
+            continue;
+        }
+        
         $service_therapists = kab_get_therapists_for_service($service_id);
         
         foreach ($service_therapists as $therapist) {
@@ -623,7 +721,7 @@ function kab_get_categories_for_therapist_ajax() {
         return;
     }
     
-    // Get unique category IDs from therapist's services
+    // Get unique category IDs from therapist's services (filtered by service set if provided)
     global $wpdb;
     $location_service_table = $wpdb->prefix . 'kab_location_service';
     

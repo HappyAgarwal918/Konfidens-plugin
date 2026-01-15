@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.1.2
+ * Version: 1.1.4
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('KAB_VERSION', '1.1.2');
+define('KAB_VERSION', '1.1.4');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -351,7 +351,11 @@ function kab_button_shortcode($atts, $content = null) {
                 // Determine which template to use based on parameters
                 if (!empty($atts['id'])) {
                     // Therapist First flow: Therapist is pre-selected → show services according to therapist → Location → Date & Time → Personal Details
-                    $therapist_atts = array('therapist_id' => $atts['id'], 'context' => 'popup');
+                    $therapist_atts = array(
+                        'therapist_id' => $atts['id'], 
+                        'context' => 'popup',
+                        'service_set_id' => !empty($atts['set']) ? $atts['set'] : ''
+                    );
                     $atts = $therapist_atts;
                     include KAB_PLUGIN_DIR . 'frontend/templates/form-template-therapist-first.php';
                 } else {

@@ -172,7 +172,13 @@ The plugin provides a `[su_button]` shortcode to create booking buttons that ope
    - Only shows categories and locations that contain services from the specified service set
    - Service set ID can be found in the Service Sets admin page
 
-4. **`[su_button background="#007bff" class="custom-class"]Book Now[/su_button]`**: Custom styled button
+4. **`[su_button id="SPECIALIST_ID" set="SET_ID"]Book Now[/su_button]`**: Creates a button with pre-selected therapist AND service set filtering
+   - Flow: Therapist (pre-selected) → Services (intersection of therapist services AND service set) → Location (filtered) → Date & Time → Personal Details
+   - Shows only services that are BOTH available for the therapist AND in the service set
+   - Categories and locations are filtered based on the intersection of therapist services and service set
+   - Example: If service set contains services 1,2,3,4,5 and therapist only provides services 2,3,5, then only services 2,3,5 will be shown
+
+5. **`[su_button background="#007bff" class="custom-class"]Book Now[/su_button]`**: Custom styled button
    - Same flow as standard button with custom styling
 
 ### Multistep Form
@@ -188,12 +194,18 @@ The plugin uses a multi-step form with progress tracking. The form adapts based 
 - Step 6: **Booking Confirmation**: Shows success message and booking details
 
 **Therapist-First Flow (when specialist is pre-selected):**
-- Step 1: **Service Selection**: Shows all available services that the pre-selected therapist can provide
-- Step 2: **Location Selection**: Shows locations based on selected service, with option to change therapist
+- Step 0: **Therapist Selection** (optional): If user clicks to change therapist, shows all available therapists (filtered by service set if provided - only shows therapists who provide at least one service from the set)
+- Step 1: **Category Selection**: Shows categories for services that the pre-selected therapist can provide (filtered by service set if provided)
+- Step 2: **Location Selection**: Shows locations based on selected category, with option to change therapist
 - Step 3: **Specialist Selection**: Skipped (therapist already selected)
 - Step 4: **Date Picker**: Custom calendar showing only available dates and **Time Slot Selection**: Displays available time slots for selected date
 - Step 5: **Form Submission**: Handles validation, reCAPTCHA verification, and API submission
 - Step 6: **Booking Confirmation**: Shows success message and booking details
+
+**Note:** When both therapist (`id`) and service set (`set`) are specified:
+- The form shows only services that are available for BOTH the therapist AND in the service set
+- Categories and locations are filtered accordingly
+- If the user changes therapist (Step 0), only therapists who provide at least one service from the service set are shown
 
 ## Admin Interface
 

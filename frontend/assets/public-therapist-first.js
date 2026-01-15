@@ -22,6 +22,7 @@
             this.therapistId = $form.data('therapist-id') || '';
             // Store original pre-selected therapist ID to distinguish from user-selected
             this.preselectedTherapistId = $form.data('therapist-id') || '';
+            this.serviceSetId = $form.data('service-set') || ''; // Get service set ID from data attribute
             this.serviceId = '';
             this.locationId = '';
             this.categoryId = ''; // Store selected category ID
@@ -291,7 +292,8 @@
                 data: {
                     action: 'kab_get_categories_for_therapist',
                     therapist_id: loadingForTherapistId,
-                    nonce: kab_vars.nonce
+                    nonce: kab_vars.nonce,
+                    service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
                     // Only process if this response is for the current therapist
@@ -430,7 +432,8 @@
                 type: 'POST',
                 data: {
                     action: 'kab_get_all_therapists',
-                    nonce: kab_vars.nonce
+                    nonce: kab_vars.nonce,
+                    service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
                     if (response.success && response.data.therapists) {
@@ -550,7 +553,8 @@
                 data: {
                     action: 'kab_get_locations_by_category',
                     category_id: this.categoryId,
-                    nonce: kab_vars.nonce
+                    nonce: kab_vars.nonce,
+                    service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
                     if (response.success && response.data.locations) {

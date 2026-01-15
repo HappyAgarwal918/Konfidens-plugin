@@ -737,7 +737,7 @@ function kab_display_service_sets_page() {
                                 </td>
                                 <td>
                                     <code style="background: #f0f0f0; padding: 5px 10px; border-radius: 3px; display: block; margin-bottom: 5px;">
-                                        [su_button set="<?php echo esc_attr($set_id); ?>"]<?php _e('Text', 'konfidens-appointment-booking'); ?>[/su_button]
+                                        set="<?php echo esc_attr($set_id); ?>"
                                     </code>
                                 </td>
                                 <td>

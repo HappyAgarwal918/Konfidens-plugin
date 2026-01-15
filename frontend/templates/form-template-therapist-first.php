@@ -13,6 +13,7 @@ $context = isset($atts['context']) ? $atts['context'] : 'sidebar';
 
 // Get pre-selected values
 $preselected_therapist = isset($atts['therapist_id']) ? $atts['therapist_id'] : '';
+$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : '';
 
 // Form classes
 $form_classes = array('kab-booking-form', 'kab-therapist-first');
@@ -20,7 +21,8 @@ $form_classes[] = 'kab-context-' . $context;
 ?>
 
 <div class="<?php echo esc_attr(implode(' ', $form_classes)); ?>" 
-    data-therapist-id="<?php echo esc_attr($preselected_therapist); ?>">
+    data-therapist-id="<?php echo esc_attr($preselected_therapist); ?>"
+    <?php echo !empty($service_set_id) ? ' data-service-set="' . esc_attr($service_set_id) . '"' : ''; ?>>
     
     <div class="kab-form-progress">
         <div class="kab-progress-text">1/4</div>
