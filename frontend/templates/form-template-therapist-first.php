@@ -1,21 +1,12 @@
 <?php
-/**
- * Frontend booking form template - Therapist First Flow
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Get context
-$context = isset($atts['context']) ? $atts['context'] : 'sidebar';
-
-// Get pre-selected values
-$preselected_therapist = isset($atts['therapist_id']) ? $atts['therapist_id'] : '';
-$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : '';
-
-// Form classes
+// Therapist-first booking form template: Therapist → Services → Location → Date & Time → Personal Details
+$context = isset($atts['context']) ? $atts['context'] : 'sidebar'; // 'popup' or 'sidebar'
+$preselected_therapist = isset($atts['therapist_id']) ? $atts['therapist_id'] : ''; // Pre-selected therapist ID
+$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : ''; // Optional service set filter
 $form_classes = array('kab-booking-form', 'kab-therapist-first');
 $form_classes[] = 'kab-context-' . $context;
 ?>

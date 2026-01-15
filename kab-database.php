@@ -141,9 +141,7 @@ function kab_create_tables() {
     ) $charset_collate;");
 }
 
-/**
- * Get locations from the database
- */
+// Get all locations from database
 function kab_get_locations() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
@@ -151,9 +149,7 @@ function kab_get_locations() {
     return $wpdb->get_results("SELECT * FROM $table_name ORDER BY location_name ASC");
 }
 
-/**
- * Get location by ID
- */
+// Get single location by ID
 function kab_get_location_by_id($id) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
@@ -161,9 +157,7 @@ function kab_get_location_by_id($id) {
     return $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $id));
 }
 
-/**
- * Add a new location
- */
+// Add new location to database
 function kab_add_location($location_name, $category_id = null) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
@@ -407,9 +401,7 @@ function kab_get_service_by_category_location($category_id, $location_id) {
     return null;
 }
 
-/**
- * Get all service categories
- */
+// Get all service categories
 function kab_get_service_categories() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_service_category';
@@ -573,80 +565,6 @@ function kab_update_service_category_parent($category_id, $parent_category_id) {
 }
 
 /**
- * Get service price from API only
- * Price is always fetched from Konfidens API, not stored in database
- */
-function kab_get_service_price($service_id) {
-    // Get price from API
-    $service = kab_get_service_by_id($service_id);
-    
-    // Helper function to extract price value (handles arrays and objects)
-    // Also converts from cents to main currency unit if needed
-    $extract_price = function($value) {
-        $raw_price = '';
-        
-        if (is_array($value)) {
-            // If it's an array, try to get the first numeric value or join them
-            foreach ($value as $item) {
-                if (is_numeric($item)) {
-                    $raw_price = (string) $item;
-                    break;
-                }
-            }
-            // If no numeric value found, return first item as string
-            if (empty($raw_price)) {
-                $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
-            }
-        } elseif (is_object($value)) {
-            // If it's an object, try to get a value property
-            if (isset($value->value)) {
-                $raw_price = (string) $value->value;
-            } elseif (isset($value->amount)) {
-                $raw_price = (string) $value->amount;
-            } elseif (isset($value->price)) {
-                $raw_price = (string) $value->price;
-            }
-        } else {
-            $raw_price = (string) $value;
-        }
-        
-        // Convert from cents to main currency if the price seems to be in cents
-        // If price is a number and >= 1000, assume it might be in cents
-        if (!empty($raw_price) && is_numeric($raw_price)) {
-            $numeric_price = floatval($raw_price);
-            // If price is >= 1000 and is a whole number, likely in cents
-            // Convert by dividing by 100 (e.g., 119000 cents = 1190.00)
-            if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
-                $numeric_price = $numeric_price / 100;
-                // Format to 2 decimal places, remove trailing zeros
-                $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
-                return (string) $numeric_price;
-            }
-        }
-        
-        return $raw_price;
-    };
-    
-    // Check if API response has price field
-    if (!empty($service)) {
-        // Check common price field names (in order of likelihood)
-        $price_fields = array('price', 'Price', 'amount', 'Amount');
-        
-        foreach ($price_fields as $field) {
-            if (isset($service[$field])) {
-                $price = $extract_price($service[$field]);
-                if (!empty($price)) {
-                    return $price;
-                }
-            }
-        }
-    }
-    
-    // No price found in API response
-    return '0';
-}
-
-/**
  * Add or update service location
  */
 function kab_add_update_service_location($service_id, $location_ids, $category_id = null) {
@@ -701,54 +619,7 @@ function kab_add_update_service_location($service_id, $location_ids, $category_i
     }
 }
 
-
-/**
- * Get specialist locations
- */
-function kab_get_specialist_locations($specialist_id) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'kab_location_specialist';
-    
-    $specialist_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
-    
-    if ($specialist_location) {
-        return explode(',', $specialist_location->location_ids);
-    }
-    
-    return array();
-}
-
-/**
- * Add or update specialist location
- */
-function kab_add_update_specialist_location($specialist_id, $location_ids) {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'kab_location_specialist';
-    
-    $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
-    
-    if ($existing) {
-        return $wpdb->update(
-            $table_name,
-            array('location_ids' => sanitize_text_field($location_ids)),
-            array('specialist_id' => $specialist_id)
-        );
-    } else {
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'specialist_id' => sanitize_text_field($specialist_id),
-                'location_ids' => sanitize_text_field($location_ids)
-            )
-        );
-        
-        return $result ? $wpdb->insert_id : false;
-    }
-}
-
-/**
- * Get specialist tags
- */
+// Get tags stored for a specialist
 function kab_get_specialist_tags($specialist_id) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_specialist';
@@ -810,9 +681,7 @@ function kab_update_specialist_tags($specialist_id, $tags) {
     }
 }
 
-/**
- * Save booking data
- */
+// Save booking to local database after successful API booking
 function kab_save_booking($booking_data) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_booking_form_data';
@@ -884,9 +753,7 @@ function kab_import_services($services) {
     return $imported;
 }
 
-/**
- * Get all bookings
- */
+// Get all bookings from database with pagination
 function kab_get_all_bookings($limit = 20, $offset = 0) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_booking_form_data';
@@ -900,9 +767,7 @@ function kab_get_all_bookings($limit = 20, $offset = 0) {
     );
 }
 
-/**
- * Get settings
- */
+// Get plugin settings from database
 function kab_get_settings() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_setting';
@@ -913,18 +778,14 @@ function kab_get_settings() {
         return (object) array(
             'base_url' => '',
             'api_key' => '',
-            'clinic_id' => '',
-            'primary_color' => '#007bff',
-            'booking_msg' => 'Thank you for booking with us. Your appointment has been confirmed.'
+            'clinic_id' => ''
         );
     }
     
     return $settings;
 }
 
-/**
- * Save settings
- */
+// Save plugin settings to database
 function kab_save_settings($settings) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_setting';
@@ -932,9 +793,7 @@ function kab_save_settings($settings) {
     $data = array(
         'base_url' => esc_url_raw($settings['base_url']),
         'api_key' => sanitize_text_field($settings['api_key']),
-        'clinic_id' => sanitize_text_field($settings['clinic_id']),
-        'primary_color' => sanitize_hex_color($settings['primary_color']),
-        'booking_msg' => wp_kses_post($settings['booking_msg'])
+        'clinic_id' => sanitize_text_field($settings['clinic_id'])
     );
     
     $existing = $wpdb->get_row("SELECT * FROM $table_name LIMIT 1");

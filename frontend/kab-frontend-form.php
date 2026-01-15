@@ -1,16 +1,9 @@
 <?php
-/**
- * Frontend form functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Get service set by ID
- */
+// Get service set configuration by ID
 function kab_get_service_set($set_id) {
     $service_sets = get_option('kab_service_sets', array());
     if (isset($service_sets[$set_id])) {
@@ -19,9 +12,7 @@ function kab_get_service_set($set_id) {
     return null;
 }
 
-/**
- * Get categories filtered by service set
- */
+// Get categories that contain services from the specified service set
 function kab_get_categories_by_service_set($set_id) {
     $service_set = kab_get_service_set($set_id);
     if (!$service_set || empty($service_set['service_ids'])) {
@@ -53,9 +44,7 @@ function kab_get_categories_by_service_set($set_id) {
     return $categories;
 }
 
-/**
- * Get locations filtered by service set
- */
+// Get locations associated with services in the specified service set
 function kab_get_locations_by_service_set($set_id) {
     $service_set = kab_get_service_set($set_id);
     if (!$service_set || empty($service_set['service_ids'])) {
@@ -182,9 +171,7 @@ function kab_get_services() {
 add_action('wp_ajax_kab_get_services', 'kab_get_services');
 add_action('wp_ajax_nopriv_kab_get_services', 'kab_get_services');
 
-/**
- * AJAX handler for getting locations by category
- */
+// AJAX handler: Get locations for selected category (filtered by service set if provided)
 function kab_get_locations_by_category_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
@@ -342,9 +329,7 @@ function kab_get_locations_ajax() {
 add_action('wp_ajax_kab_get_locations', 'kab_get_locations_ajax');
 add_action('wp_ajax_nopriv_kab_get_locations', 'kab_get_locations_ajax');
 
-/**
- * AJAX handler for getting specialists
- */
+// AJAX handler: Get specialists/therapists for selected service
 function kab_get_specialists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
@@ -414,10 +399,7 @@ function kab_get_specialists_ajax() {
 add_action('wp_ajax_kab_get_specialists', 'kab_get_specialists_ajax');
 add_action('wp_ajax_nopriv_kab_get_specialists', 'kab_get_specialists_ajax');
 
-/**
- * AJAX handler for getting all therapists (not filtered by service)
- * Can optionally filter by service set to only show therapists who provide services in the set
- */
+// AJAX handler: Get all therapists (filtered by service set if provided) - for therapist-first form Step 0
 function kab_get_all_therapists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
@@ -956,9 +938,7 @@ function kab_get_available_dates() {
 add_action('wp_ajax_kab_get_available_dates', 'kab_get_available_dates');
 add_action('wp_ajax_nopriv_kab_get_available_dates', 'kab_get_available_dates');
 
-/**
- * AJAX handler for getting timeslots
- */
+// AJAX handler: Get available time slots for selected date, service, and specialist
 function kab_get_timeslots_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
@@ -1026,9 +1006,7 @@ function kab_get_timeslots_ajax() {
 add_action('wp_ajax_kab_get_timeslots', 'kab_get_timeslots_ajax');
 add_action('wp_ajax_nopriv_kab_get_timeslots', 'kab_get_timeslots_ajax');
 
-/**
- * AJAX handler for creating a booking
- */
+// AJAX handler: Create booking via Konfidens API and save to local database
 function kab_create_booking() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {

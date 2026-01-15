@@ -181,7 +181,7 @@
     cursor: not-allowed;
 }
 
-.kab-service-info p, .kab-category-name {
+.kab-category-name {
     font-family: "Manrope", Sans-serif;
     font-size: 18px;
     font-weight: 400;
@@ -971,6 +971,12 @@
     border-radius: var(--kab-border-radius);
 }
 
+.kab-no-time-slots {
+    text-align: center;
+    padding: 20px;
+    color: var(--kab-gray);
+}
+
 /* Popup Styles */
 .kab-popup {
     display: none;
@@ -1023,43 +1029,6 @@
     color: #000;
 }
 
-/* Thank You Page */
-.kab-thank-you-page {
-    max-width: 800px;
-    margin: 40px auto;
-    padding: 20px;
-}
-
-.kab-thank-you-container {
-    background-color: var(--kab-white);
-    border-radius: var(--kab-border-radius);
-    box-shadow: var(--kab-box-shadow);
-    padding: 30px;
-}
-
-.kab-thank-you-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.kab-thank-you-message {
-    margin-bottom: 30px;
-    text-align: center;
-}
-
-.kab-thank-you-details {
-    margin-bottom: 30px;
-}
-
-.kab-thank-you-details h2 {
-    margin-bottom: 20px;
-    font-size: 20px;
-}
-
-.kab-thank-you-actions {
-    text-align: center;
-}
-
 .kab-button {
     background-color: #452DAF;
     font-family: "Manrope", Sans-serif !important;
@@ -1080,15 +1049,10 @@
     color: #FFFFFF;
     border-color: #31207C;
 }
-
-.kab-selected-service-card{
-    align-items: center;
-    background-color: #fff;
-    border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    max-width: 320px;
+.kab-button:focus {
+    background-color: #31207C !important;
 }
+
 
 /* Responsive Styles */
 @media (max-width: 768px) {
@@ -1133,7 +1097,6 @@
         font-size: 24px;
     }
     .kab-form-step .kab-step-header p,
-    .kab-service-info p, 
     .kab-category-name, 
     .kab-specialist-description, 
     .kab-summary-label, 

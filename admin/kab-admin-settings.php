@@ -1,18 +1,10 @@
 <?php
-/**
- * Admin settings functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Add admin menu
- */
+// Add Konfidens menu and submenus to WordPress admin
 function kab_add_admin_menu() {
-    // Main menu
     add_menu_page(
         __('Konfidens', 'konfidens-appointment-booking'),
         __('Konfidens', 'konfidens-appointment-booking'),
@@ -23,7 +15,6 @@ function kab_add_admin_menu() {
         30
     );
     
-    // Service Categories submenu
     add_submenu_page(
         'konfidens',
         __('Service Categories', 'konfidens-appointment-booking'),
@@ -33,7 +24,6 @@ function kab_add_admin_menu() {
         'kab_display_service_categories_page'
     );
     
-    // Services submenu
     add_submenu_page(
         'konfidens',
         __('Services', 'konfidens-appointment-booking'),
@@ -43,7 +33,6 @@ function kab_add_admin_menu() {
         'kab_display_services_page'
     );
     
-    // Therapists submenu
     add_submenu_page(
         'konfidens',
         __('Therapists', 'konfidens-appointment-booking'),
@@ -53,7 +42,6 @@ function kab_add_admin_menu() {
         'kab_display_therapists_page'
     );
     
-    // Locations submenu
     add_submenu_page(
         'konfidens',
         __('Locations', 'konfidens-appointment-booking'),
@@ -63,7 +51,6 @@ function kab_add_admin_menu() {
         'kab_display_locations_page'
     );
     
-    // Settings submenu
     add_submenu_page(
         'konfidens',
         __('Settings', 'konfidens-appointment-booking'),
@@ -73,7 +60,6 @@ function kab_add_admin_menu() {
         'kab_display_settings_page'
     );
     
-    // Service Sets submenu (for alternative form)
     add_submenu_page(
         'konfidens',
         __('Service Sets', 'konfidens-appointment-booking'),
@@ -83,7 +69,6 @@ function kab_add_admin_menu() {
         'kab_display_service_sets_page'
     );
     
-    // Bookings submenu
     add_submenu_page(
         'konfidens',
         __('Bookings', 'konfidens-appointment-booking'),
@@ -95,14 +80,8 @@ function kab_add_admin_menu() {
 }
 add_action('admin_menu', 'kab_add_admin_menu');
 
-/**
- * Display dashboard page
- */
+// Display main dashboard page with API status and shortcode examples
 function kab_display_dashboard_page() {
-    // Get recent bookings
-    $recent_bookings = kab_get_all_bookings(5);
-    
-    // Get API status
     $api_status = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     $api_connected = $api_status['success'];
     
@@ -154,51 +133,6 @@ function kab_display_dashboard_page() {
             
             <div class="kab-dashboard-widget">
                 <div class="kab-dashboard-widget-header">
-                    <h2><?php _e('Recent Bookings', 'konfidens-appointment-booking'); ?></h2>
-                </div>
-                <div class="kab-dashboard-widget-content">
-                    <?php if (!empty($recent_bookings)): ?>
-                        <table class="widefat">
-                            <thead>
-                                <tr>
-                                    <th><?php _e('Booking ID', 'konfidens-appointment-booking'); ?></th>
-                                    <th><?php _e('Patient', 'konfidens-appointment-booking'); ?></th>
-                                    <th><?php _e('Service', 'konfidens-appointment-booking'); ?></th>
-                                    <th><?php _e('Therapist', 'konfidens-appointment-booking'); ?></th>
-                                    <th><?php _e('Date & Time', 'konfidens-appointment-booking'); ?></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($recent_bookings as $booking): ?>
-                                    <tr>
-                                        <td><?php echo esc_html($booking->booking_id); ?></td>
-                                        <td><?php echo esc_html($booking->first_name . ' ' . $booking->last_name); ?></td>
-                                        <td><?php echo esc_html($booking->service_name); ?></td>
-                                        <td><?php echo esc_html($booking->specialist_name); ?></td>
-                                        <td>
-                                            <?php 
-                                            $date = date_i18n(get_option('date_format'), strtotime($booking->timeslot_date));
-                                            $time = date_i18n(get_option('time_format'), strtotime($booking->timeslot_time));
-                                            echo esc_html($date . ' ' . $time);
-                                            ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                        <p class="kab-view-all">
-                            <a href="<?php echo admin_url('admin.php?page=konfidens-bookings'); ?>" class="button button-secondary">
-                                <?php _e('View All Bookings', 'konfidens-appointment-booking'); ?>
-                            </a>
-                        </p>
-                    <?php else: ?>
-                        <p><?php _e('No bookings yet.', 'konfidens-appointment-booking'); ?></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <div class="kab-dashboard-widget">
-                <div class="kab-dashboard-widget-header">
                     <h2><?php _e('Shortcodes', 'konfidens-appointment-booking'); ?></h2>
                 </div>
                 <div class="kab-dashboard-widget-content">
@@ -216,6 +150,18 @@ function kab_display_dashboard_page() {
                         <p><?php _e('Creates a button that opens the booking form in a popup with a specific therapist pre-selected. Flow: Therapist (pre-selected) → Services (according to therapist) → Location → Date & Time → Personal Details. You can change the therapist. Replace SPECIALIST_ID with the actual therapist ID.', 'konfidens-appointment-booking'); ?></p>
                     </div>
                     
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('3. Popup Button with Service Set', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[su_button set="SET_ID"]Book Now[/su_button]</code>
+                        <p><?php _e('Creates a button filtered by service set. Only shows categories and locations that contain services from the specified service set. Flow: Category (filtered) → Location (filtered) → Therapist → Date & Time → Personal Details. Replace SET_ID with the service set ID from the Service Sets page.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
+                    <div class="kab-shortcode-example">
+                        <h4><?php _e('4. Popup Button with Therapist AND Service Set', 'konfidens-appointment-booking'); ?></h4>
+                        <code>[su_button id="SPECIALIST_ID" set="SET_ID"]Book Now[/su_button]</code>
+                        <p><?php _e('Creates a button with pre-selected therapist AND service set filtering. Shows only services that are available for BOTH the therapist AND in the service set. Flow: Therapist (pre-selected) → Services (intersection) → Location (filtered) → Date & Time → Personal Details. Replace SPECIALIST_ID and SET_ID with actual values.', 'konfidens-appointment-booking'); ?></p>
+                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -223,11 +169,8 @@ function kab_display_dashboard_page() {
     <?php
 }
 
-/**
- * Display bookings page
- */
+// Display all bookings from local database
 function kab_display_bookings_page() {
-    // Get bookings
     $bookings = kab_get_all_bookings();
     
     ?>
@@ -277,32 +220,20 @@ function kab_display_bookings_page() {
     <?php
 }
 
-/**
- * Display settings page
- */
+// Display and handle settings page (API credentials, email, reCAPTCHA)
 function kab_display_settings_page() {
-    // Check if form is submitted
     if (isset($_POST['kab_save_settings']) && check_admin_referer('kab_settings_nonce', 'kab_settings_nonce')) {
-        // Save settings
         $settings = array(
             'base_url' => sanitize_url($_POST['kab_base_url']),
             'api_key' => sanitize_text_field($_POST['kab_api_key']),
-            'clinic_id' => sanitize_text_field($_POST['kab_clinic_id']),
-            'primary_color' => sanitize_hex_color($_POST['kab_primary_color']),
-            'booking_msg' => wp_kses_post($_POST['kab_booking_msg'])
+            'clinic_id' => sanitize_text_field($_POST['kab_clinic_id'])
         );
         
-        // Save settings in database table
         $result = kab_save_settings($settings);
-        
-        // Save WordPress options
         update_option('kab_base_url', $settings['base_url']);
         update_option('kab_api_key', $settings['api_key']);
         update_option('kab_clinic_id', $settings['clinic_id']);
-        update_option('kab_primary_color', $settings['primary_color']);
-        update_option('kab_booking_msg', $settings['booking_msg']);
         
-        // Email settings
         if (isset($_POST['kab_email_recipient'])) {
             update_option('kab_email_recipient', sanitize_email($_POST['kab_email_recipient']));
         }
@@ -345,7 +276,6 @@ function kab_display_settings_page() {
         }
     }
     
-    // Get settings
     $settings = kab_get_settings();
     $email_recipient = get_option('kab_email_recipient', get_option('admin_email'));
     $email_subject = get_option('kab_email_subject', __('New Appointment Booking', 'konfidens-appointment-booking'));
@@ -395,44 +325,6 @@ function kab_display_settings_page() {
                             <input type="text" name="kab_clinic_id" id="kab_clinic_id" class="regular-text" 
                                 value="<?php echo esc_attr($settings->clinic_id); ?>" required />
                             <p class="description"><?php _e('Your Konfidens clinic identifier.', 'konfidens-appointment-booking'); ?></p>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
-            <div class="kab-settings-section">
-                <h2><?php _e('Appearance Settings', 'konfidens-appointment-booking'); ?></h2>
-                <p><?php _e('Customize the appearance of the booking form.', 'konfidens-appointment-booking'); ?></p>
-                
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="kab_primary_color"><?php _e('Primary Color', 'konfidens-appointment-booking'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" name="kab_primary_color" id="kab_primary_color" class="kab-color-picker" 
-                                value="<?php echo esc_attr($settings->primary_color); ?>" />
-                            <p class="description"><?php _e('Choose the primary color for buttons and highlights.', 'konfidens-appointment-booking'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="kab_booking_msg"><?php _e('Booking Confirmation Message', 'konfidens-appointment-booking'); ?></label>
-                        </th>
-                        <td>
-                            <?php
-                            wp_editor(
-                                $settings->booking_msg,
-                                'kab_booking_msg',
-                                array(
-                                    'textarea_name' => 'kab_booking_msg',
-                                    'textarea_rows' => 5,
-                                    'media_buttons' => false,
-                                    'teeny' => true
-                                )
-                            );
-                            ?>
-                            <p class="description"><?php _e('The message displayed to users after a successful booking.', 'konfidens-appointment-booking'); ?></p>
                         </td>
                     </tr>
                 </table>
@@ -512,11 +404,8 @@ function kab_display_settings_page() {
     <?php
 }
 
-/**
- * Display Service Sets page
- */
+// Display service sets management page (create/edit/delete service sets)
 function kab_display_service_sets_page() {
-    // Handle form submissions
     if (isset($_POST['kab_save_service_set']) && check_admin_referer('kab_service_set_nonce', 'kab_service_set_nonce')) {
         $set_name = sanitize_text_field($_POST['kab_set_name']);
         $set_id = isset($_POST['kab_set_id']) ? sanitize_text_field($_POST['kab_set_id']) : '';

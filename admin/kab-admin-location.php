@@ -1,18 +1,10 @@
 <?php
-/**
- * Admin location functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Display locations page
- */
+// Display locations page: Manage location categories and locations
 function kab_display_locations_page() {
-    // Handle category form submissions
     if (isset($_POST['kab_save_location_category']) && check_admin_referer('kab_location_category_nonce', 'kab_location_category_nonce')) {
         $category_name = sanitize_text_field($_POST['kab_category_name']);
         $category_id = isset($_POST['kab_category_id']) ? intval($_POST['kab_category_id']) : 0;

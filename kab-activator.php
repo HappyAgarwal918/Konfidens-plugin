@@ -1,37 +1,21 @@
 <?php
-/**
- * Activator functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Plugin activation
- */
+// Plugin activation: Create tables, set defaults, flush rewrite rules
 function kab_activate() {
-    // Create database tables
     kab_create_tables();
-    
-    // Set default options
     kab_set_default_options();
-    
-    // Flush rewrite rules
     flush_rewrite_rules();
 }
 
-/**
- * Set default options
- */
+// Set default WordPress options if they don't exist
 function kab_set_default_options() {
     $default_options = array(
         'kab_base_url' => '',
         'kab_api_key' => '',
         'kab_clinic_id' => '',
-        'kab_primary_color' => '#007bff',
-        'kab_booking_msg' => 'Thank you for booking with us. Your appointment has been confirmed.',
         'kab_email_recipient' => get_option('admin_email'),
         'kab_email_subject' => 'New Appointment Booking',
         'kab_enable_recaptcha' => 0,
@@ -49,18 +33,13 @@ function kab_set_default_options() {
     kab_add_default_categories();
 }
 
-/**
- * Add default categories/locations
- */
+// Add default location categories if database is empty
 function kab_add_default_categories() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location';
-    
-    // Check if any categories exist
     $count = $wpdb->get_var("SELECT COUNT(*) FROM $table_name");
     
     if ($count == 0) {
-        // Add default categories
         $default_categories = array(
             'Online Video Samtale',
             'Hjemmebesøk',
@@ -68,14 +47,9 @@ function kab_add_default_categories() {
         );
         
         foreach ($default_categories as $category) {
-            $wpdb->insert(
-                $table_name,
-                array('location_name' => $category)
-            );
+            $wpdb->insert($table_name, array('location_name' => $category));
         }
-        
         return true;
     }
-    
     return false;
 }

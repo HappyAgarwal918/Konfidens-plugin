@@ -1,75 +1,43 @@
 <?php
-/**
- * Email functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Send booking notification email to admin
- */
+// Send email notification to admin and confirmation email to user after booking
 function kab_send_booking_notification($booking_data) {
-    // Get email settings
     $recipient = get_option('kab_email_recipient', get_option('admin_email'));
     $subject = get_option('kab_email_subject', __('New Appointment Booking', 'konfidens-appointment-booking'));
-    
-    // Format date and time
     $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
     $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
-    
-    // Build email content
     $content = kab_get_email_template($booking_data, $date, $time);
-    
-    // Set headers
     $headers = array(
         'Content-Type: text/html; charset=UTF-8',
         'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
     );
-    
-    // Send email to admin
     $admin_email_sent = wp_mail($recipient, $subject, $content, $headers);
-    
-    // Also send confirmation email to user
     kab_send_user_confirmation_email($booking_data);
-    
     return $admin_email_sent;
 }
 
-/**
- * Send confirmation email to user
- */
+// Send booking confirmation email to the user
 function kab_send_user_confirmation_email($booking_data) {
-    // Get user email
     if (empty($booking_data['email'])) {
         return false;
     }
     
     $user_email = sanitize_email($booking_data['email']);
     $subject = __('Booking Confirmation', 'konfidens-appointment-booking');
-    
-    // Format date and time
     $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
     $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
-    
-    // Build email content for user
     $content = kab_get_user_confirmation_email_template($booking_data, $date, $time);
-    
-    // Set headers
     $headers = array(
         'Content-Type: text/html; charset=UTF-8',
         'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
     );
-    
-    // Send email to user
     return wp_mail($user_email, $subject, $content, $headers);
 }
 
-/**
- * Get email template
- */
+// Generate HTML email template for admin notification
 function kab_get_email_template($booking_data, $date, $time) {
     ob_start();
     ?>
@@ -210,9 +178,7 @@ function kab_get_email_template($booking_data, $date, $time) {
     return ob_get_clean();
 }
 
-/**
- * Get user confirmation email template
- */
+// Generate HTML email template for user confirmation
 function kab_get_user_confirmation_email_template($booking_data, $date, $time) {
     ob_start();
     ?>

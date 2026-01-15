@@ -1,18 +1,10 @@
 <?php
-/**
- * Admin service functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Display services page
- */
+// Display services page: Import services from API and assign to categories/locations
 function kab_display_services_page() {
-    // Get services from API
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     $services = array();
     

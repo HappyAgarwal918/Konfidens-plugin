@@ -1,18 +1,10 @@
 <?php
-/**
- * Admin specialist functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Display therapists page
- */
+// Display therapists page: Show all therapists and manage tags
 function kab_display_therapists_page() {
-    // Get therapists
     $therapists = kab_get_all_therapists();
     
     ?>

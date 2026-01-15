@@ -1061,7 +1061,6 @@
                             }
                         } else {
                             // Service not found - show error but still allow to proceed
-                            console.error('Service not found for category and location combination');
                             if (autoAdvance) {
                                 setTimeout(() => {
                                     self.nextStep();
@@ -1071,7 +1070,6 @@
                     },
                     error: function() {
                         // Error getting service - still allow to proceed
-                        console.error('Error getting service by category and location');
                         if (autoAdvance) {
                             setTimeout(() => {
                                 self.nextStep();

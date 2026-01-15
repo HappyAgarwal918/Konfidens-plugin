@@ -67,9 +67,8 @@ The plugin creates several custom database tables upon activation:
    - `base_url`: Konfidens API base URL
    - `api_key`: API authentication key
    - `clinic_id`: Clinic identifier
-   - `primary_color`: UI color setting
-   - `booking_msg`: Customizable booking message
    - `created_at`/`updated_at`: Timestamps
+   - **Note:** `primary_color` and `booking_msg` columns exist in the database for backward compatibility but are no longer used. Primary colors are defined directly in the CSS file, and booking messages are defined directly in the thank you template.
 
 7. **`{prefix}_kab_location_specialist`**: Stores specialist metadata
    - `id`: Auto-increment ID
@@ -247,8 +246,6 @@ The plugin provides several admin pages for configuration accessible under the "
    - Base URL: Konfidens API base URL
    - API Key: Authentication key for API requests
    - Clinic ID: Your clinic identifier
-   - Primary Color: Customize the plugin's primary color theme
-   - Booking Message: Customizable confirmation message
    - Email Settings: Configure email recipient and subject
    - Google reCAPTCHA: Enable and configure reCAPTCHA v3 for spam protection
 
@@ -271,8 +268,6 @@ The plugin provides several admin pages for configuration accessible under the "
    - Enter your API Key
    - Enter your Clinic ID
 5. Configure additional settings:
-   - Set primary color for the booking form
-   - Customize booking confirmation message
    - Configure email notifications
    - Enable and configure Google reCAPTCHA (optional)
 6. Set up your data:
@@ -308,8 +303,6 @@ The plugin is organized into the following structure:
 - `frontend/assets/public-therapist-first.js`: Frontend JavaScript for therapist-first flow
 - `frontend/templates/form-template.php`: Standard form template (category-based flow)
 - `frontend/templates/form-template-therapist-first.php`: Therapist-first form template
-- `frontend/templates/thank-you-template.php`: Thank you page template
-- `frontend/templates/email-template.php`: Email template for notifications
 
 ## Usage
 
@@ -367,15 +360,6 @@ When a booking is made, the plugin sends email notifications to both the adminis
 
 For direct bookings (via URL), a separate notification is sent with available information.
 
-## Thank You Page
-
-The plugin creates a custom endpoint `/booking/thanks` that displays a thank you message after successful booking. This page can be accessed directly via URL with parameters:
-
-```
-/booking/thanks?serviceId=XXX&serviceTitle=XXX&practitionerId=XXX&startsAt=XXX&bookingId=XXX
-```
-
-This endpoint is useful for direct bookings from external sources or redirects after successful API bookings.
 
 ## Requirements
 
@@ -400,11 +384,11 @@ This endpoint is useful for direct bookings from external sources or redirects a
 
 The plugin's appearance can be customized through:
 
-1. **Primary Color**: Set in Settings to customize the plugin's color scheme
+1. **Primary Color**: Edit the CSS variables in `frontend/assets/public.css` to customize the plugin's color scheme
 2. **CSS Files**: Override styles using the CSS files in `admin/assets` and `frontend/assets` directories
-3. **Booking Message**: Customize the confirmation message in Settings
-4. **Button Styling**: Use `background` and `class` parameters in shortcodes
-5. **Email Templates**: Customize email templates in `frontend/templates/email-template.php`
+3. **Button Styling**: Use `background` and `class` parameters in shortcodes
+4. **Email Templates**: Customize email templates in `frontend/kab-email.php` (functions `kab_get_email_template()` and `kab_get_user_confirmation_email_template()`)
+5. **Form Templates**: Customize booking confirmation messages directly in the form templates (`form-template.php` and `form-template-therapist-first.php`)
 
 The plugin uses CSS custom properties (variables) for the primary color, making it easy to theme.
 
@@ -421,7 +405,7 @@ If bookings are not working properly, check:
 7. **Cache**: Clear WordPress transients if services/specialists are not updating
 8. **reCAPTCHA**: If enabled, verify site key and secret key are correct
 9. **Email Settings**: Check email recipient and SMTP configuration if emails are not sending
-10. **Rewrite Rules**: Flush rewrite rules if thank you page is not accessible (Settings > Permalinks > Save)
+10. **Rewrite Rules**: Flush rewrite rules if needed (Settings > Permalinks > Save)
 
 ## Performance
 

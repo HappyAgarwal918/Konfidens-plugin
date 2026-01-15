@@ -1,23 +1,12 @@
 <?php
-/**
- * Frontend booking form template
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Get context
-$context = isset($atts['context']) ? $atts['context'] : 'sidebar';
-
-// Get popup ID for tracking
-$popup_id = isset($atts['popup_id']) ? $atts['popup_id'] : '';
-
-// Get service set ID if provided
-$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : '';
-
-// Generate unique form ID for tracking
+// Standard booking form template: Category → Location → Therapist → Date & Time → Personal Details
+$context = isset($atts['context']) ? $atts['context'] : 'sidebar'; // 'popup' or 'sidebar'
+$popup_id = isset($atts['popup_id']) ? $atts['popup_id'] : ''; // Unique popup ID
+$service_set_id = isset($atts['service_set_id']) ? $atts['service_set_id'] : ''; // Optional service set filter
 $form_unique_id = 'kab-form-' . uniqid();
 
 // Form classes

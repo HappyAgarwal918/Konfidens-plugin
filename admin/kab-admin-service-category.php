@@ -1,18 +1,10 @@
 <?php
-/**
- * Admin service category functionality for Konfidens Appointment Booking
- */
-
-// Exit if accessed directly
 if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Display service categories page
- */
+// Display service categories page: Manage service categories and parent categories
 function kab_display_service_categories_page() {
-    // Handle form submissions
     if (isset($_POST['kab_save_category']) && check_admin_referer('kab_service_category_nonce', 'kab_service_category_nonce')) {
         $category_id = isset($_POST['kab_category_id']) ? intval($_POST['kab_category_id']) : 0;
         $category_name = isset($_POST['kab_category_name']) ? sanitize_text_field($_POST['kab_category_name']) : '';
