@@ -310,18 +310,12 @@ function kab_display_services_page() {
  * Get service by ID
  */
 function kab_get_service_by_id($service_id) {
-    $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
+    // Use kab_get_services_with_priority to get service with price extracted
+    $all_services = kab_get_services_with_priority();
     
-    if ($services_response['success'] && !empty($services_response['data'])) {
-        // Filter only enabled services (same as old plugin)
-        $services = array_filter($services_response['data'], function ($service) {
-            return (isset($service['code']) ? $service['code'] === null : true) && !empty($service['enabled_by_specialists']);
-        });
-        
-        foreach ($services as $service) {
-            if ($service['id'] === $service_id) {
-                return $service;
-            }
+    foreach ($all_services as $service) {
+        if ($service['id'] === $service_id) {
+            return $service;
         }
     }
     

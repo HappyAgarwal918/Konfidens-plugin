@@ -171,7 +171,7 @@ function kab_get_services() {
 add_action('wp_ajax_kab_get_services', 'kab_get_services');
 add_action('wp_ajax_nopriv_kab_get_services', 'kab_get_services');
 
-// AJAX handler: Get locations for selected category (filtered by service set if provided)
+// AJAX handler: Get locations for selected category (filtered by service set and therapist if provided)
 function kab_get_locations_by_category_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
@@ -185,6 +185,7 @@ function kab_get_locations_by_category_ajax() {
     
     $category_id = intval($_POST['category_id']);
     $service_set_id = isset($_POST['service_set_id']) ? sanitize_text_field($_POST['service_set_id']) : '';
+    $therapist_id = isset($_POST['therapist_id']) ? sanitize_text_field($_POST['therapist_id']) : '';
     
     // Get locations by category
     $locations = kab_get_locations_by_category($category_id);
@@ -202,6 +203,34 @@ function kab_get_locations_by_category_ajax() {
         foreach ($locations as $location) {
             if (in_array($location->id, $set_location_ids)) {
                 $filtered_locations[] = $location;
+            }
+        }
+        $locations = $filtered_locations;
+    }
+    
+    // If therapist_id is provided, filter locations to only those where the therapist provides a service
+    if (!empty($therapist_id)) {
+        $filtered_locations = array();
+        foreach ($locations as $location) {
+            // Get service for this category + location combination
+            $service_id = kab_get_service_by_category_location($category_id, $location->id);
+            
+            if (!empty($service_id)) {
+                // Check if therapist provides this service
+                $therapists_for_service = kab_get_therapists_for_service($service_id);
+                $therapist_provides_service = false;
+                
+                foreach ($therapists_for_service as $therapist) {
+                    if ($therapist['id'] === $therapist_id) {
+                        $therapist_provides_service = true;
+                        break;
+                    }
+                }
+                
+                // Only include location if therapist provides the service
+                if ($therapist_provides_service) {
+                    $filtered_locations[] = $location;
+                }
             }
         }
         $locations = $filtered_locations;
@@ -228,6 +257,143 @@ add_action('wp_ajax_kab_get_locations_by_category', 'kab_get_locations_by_catego
 add_action('wp_ajax_nopriv_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
 
 /**
+ * Fetch service directly from API
+ */
+function kab_fetch_service_from_api($service_id) {
+    // Fetch services directly from API
+    $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
+    
+    if (!$services_response['success'] || empty($services_response['data'])) {
+        return null;
+    }
+    
+    // Find the specific service
+    foreach ($services_response['data'] as $s) {
+        if ((string)$s['id'] === (string)$service_id) {
+            return $s;
+        }
+    }
+    
+    return null;
+}
+
+/**
+ * AJAX handler for getting service price from API
+ */
+function kab_get_service_price_ajax() {
+    // Check nonce
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    
+    // Check required fields
+    if (!isset($_POST['service_id']) || empty($_POST['service_id'])) {
+        wp_send_json_error(array('message' => __('Service ID is required.', 'konfidens-appointment-booking')));
+    }
+    
+    $service_id = sanitize_text_field($_POST['service_id']);
+    
+    // Log: Starting price fetch
+    error_log('KAB: Fetching price for service ID: ' . $service_id);
+    
+    // Fetch service from API
+    $service = kab_fetch_service_from_api($service_id);
+    
+    if (!$service) {
+        error_log('KAB: Service not found in API response for ID: ' . $service_id);
+        wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
+    }
+    
+    // Extract price using the same logic as admin
+    $extract_price = function($value) {
+        $raw_price = '';
+        
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (is_numeric($item)) {
+                    $raw_price = (string) $item;
+                    break;
+                }
+            }
+            if (empty($raw_price)) {
+                $raw_price = is_array($value) && !empty($value) ? (string) reset($value) : '';
+            }
+        } elseif (is_object($value)) {
+            if (isset($value->value)) {
+                $raw_price = (string) $value->value;
+            } elseif (isset($value->amount)) {
+                $raw_price = (string) $value->amount;
+            } elseif (isset($value->price)) {
+                $raw_price = (string) $value->price;
+            }
+        } else {
+            $raw_price = (string) $value;
+        }
+        
+        // Convert from cents to main currency if needed
+        if (!empty($raw_price) && is_numeric($raw_price)) {
+            $numeric_price = floatval($raw_price);
+            if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
+                $numeric_price = $numeric_price / 100;
+                $numeric_price = rtrim(rtrim(number_format($numeric_price, 2, '.', ''), '0'), '.');
+                return (string) $numeric_price;
+            }
+        }
+        
+        return $raw_price;
+    };
+    
+    // Get price from API - check common field names (same as admin)
+    $price_fields = array('price', 'Price', 'amount', 'Amount');
+    $price = '';
+    
+    // Log: Service object structure
+    error_log('KAB: Service object keys: ' . implode(', ', array_keys($service)));
+    
+    foreach ($price_fields as $field) {
+        if (isset($service[$field])) {
+            error_log('KAB: Found price field "' . $field . '" with value: ' . print_r($service[$field], true));
+            $price = $extract_price($service[$field]);
+            if (!empty($price)) {
+                error_log('KAB: Extracted price: ' . $price);
+                break;
+            }
+        }
+    }
+    
+    // If not found, default to 0
+    if (empty($price)) {
+        error_log('KAB: No price found in standard fields. Checking all service fields...');
+        // Check all fields for price-related names
+        foreach ($service as $key => $value) {
+            if (stripos($key, 'price') !== false || stripos($key, 'amount') !== false || stripos($key, 'cost') !== false) {
+                error_log('KAB: Found price-related field "' . $key . '" with value: ' . print_r($value, true));
+                $extracted = $extract_price($value);
+                if (!empty($extracted)) {
+                    $price = $extracted;
+                    error_log('KAB: Extracted price from field "' . $key . '": ' . $price);
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (empty($price)) {
+        error_log('KAB: Price extraction failed - defaulting to 0');
+        $price = '0';
+    }
+    
+    // Ensure price is always a string
+    $price = (string) $price;
+    
+    error_log('KAB: Final price returned: ' . $price);
+    
+    wp_send_json_success(array('price' => $price));
+}
+add_action('wp_ajax_kab_get_service_price', 'kab_get_service_price_ajax');
+add_action('wp_ajax_nopriv_kab_get_service_price', 'kab_get_service_price_ajax');
+
+/**
  * AJAX handler for getting service by category and location
  */
 function kab_get_service_by_category_location_ajax() {
@@ -244,29 +410,63 @@ function kab_get_service_by_category_location_ajax() {
     
     $category_id = intval($_POST['category_id']);
     $location_id = intval($_POST['location_id']);
+    $therapist_id = isset($_POST['therapist_id']) ? sanitize_text_field($_POST['therapist_id']) : '';
     
     // Get service by category and location
     $service_id = kab_get_service_by_category_location($category_id, $location_id);
     
     if (!empty($service_id)) {
-        // Get all services with price information (same format as kab_get_services)
-        $all_services = kab_get_services_with_priority();
-        
-        // Find the service in the list
-        $service = null;
-        foreach ($all_services as $s) {
-            if ($s['id'] === $service_id) {
-                $service = $s;
-                break;
-            }
-        }
+        // Fetch service directly from API
+        $service = kab_fetch_service_from_api($service_id);
         
         if ($service) {
+            // If therapist_id is provided, validate that the therapist provides this service
+            if (!empty($therapist_id)) {
+                $therapists_for_service = kab_get_therapists_for_service($service_id);
+                $therapist_provides_service = false;
+                
+                foreach ($therapists_for_service as $therapist) {
+                    if ($therapist['id'] === $therapist_id) {
+                        $therapist_provides_service = true;
+                        break;
+                    }
+                }
+                
+                if (!$therapist_provides_service) {
+                    wp_send_json_error(array(
+                        'message' => __('The selected therapist does not provide this service for the selected category and location combination.', 'konfidens-appointment-booking'),
+                        'therapist_invalid' => true
+                    ));
+                    return;
+                }
+            }
+            
             wp_send_json_success(array('service' => $service));
         } else {
-            // Fallback: try kab_get_service_by_id
-            $service = kab_get_service_by_id($service_id);
+            // Fallback: try fetching directly from API
+            $service = kab_fetch_service_from_api($service_id);
             if ($service && !empty($service)) {
+                // If therapist_id is provided, validate that the therapist provides this service
+                if (!empty($therapist_id)) {
+                    $therapists_for_service = kab_get_therapists_for_service($service_id);
+                    $therapist_provides_service = false;
+                    
+                    foreach ($therapists_for_service as $therapist) {
+                        if ($therapist['id'] === $therapist_id) {
+                            $therapist_provides_service = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!$therapist_provides_service) {
+                        wp_send_json_error(array(
+                            'message' => __('The selected therapist does not provide this service for the selected category and location combination.', 'konfidens-appointment-booking'),
+                            'therapist_invalid' => true
+                        ));
+                        return;
+                    }
+                }
+                
                 wp_send_json_success(array('service' => $service));
             } else {
                 wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));

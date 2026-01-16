@@ -84,16 +84,6 @@
             
             // Set maxStep based on visible steps
             this.maxStep = this.visibleSteps.length;
-            
-            // Hide steps that are not visible
-            this.hideSkippedSteps();
-        }
-        
-        /**
-         * Hide steps that are skipped due to pre-selection
-         */
-        hideSkippedSteps() {
-            // No steps to hide - all steps are always visible
         }
         
         /**
@@ -1514,28 +1504,65 @@
                 }
             }
             
-            // Get price from stored service data
-            let price = '0';
-            if (this.serviceId && this.services.length > 0) {
-                const selectedService = this.services.find(service => service.id === this.serviceId);
-                if (selectedService && selectedService.price) {
-                    // Format price (add comma and dash if needed)
-                    price = selectedService.price || '0';
-                    if (price && price !== '0' && !price.includes(',')) {
-                        price = price + ',-';
-                    }
-                } else if (selectedService) {
-                    price = selectedService.price || '0';
-                }
-            }
-            
             // Update summary fields
             this.$form.find('.kab-summary-therapist').text(therapistName);
             this.$form.find('.kab-summary-service').text(serviceName);
             this.$form.find('.kab-summary-location').text(locationName);
             this.$form.find('.kab-summary-date').text(formattedDate);
             this.$form.find('.kab-summary-time').text(formattedTime);
-            this.$form.find('.kab-summary-price').text(price);
+            
+            // Fetch and display price from API
+            this.loadServicePrice();
+        }
+        
+        /**
+         * Load service price from API
+         */
+        loadServicePrice() {
+            const self = this;
+            
+            if (!this.serviceId) {
+                console.log('KAB: No service ID - cannot fetch price');
+                this.$form.find('.kab-summary-price').text('0');
+                return;
+            }
+            
+            console.log('KAB: Fetching price for service ID: ' + this.serviceId);
+            this.$form.find('.kab-summary-price').text('Loading...');
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_service_price',
+                    service_id: this.serviceId,
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    console.log('KAB: Price API response:', response);
+                    
+                    if (response.success && response.data && response.data.price !== undefined) {
+                        let price = response.data.price;
+                        console.log('KAB: Received price from API: ' + price);
+                        
+                        // Format price (add comma and dash if needed)
+                        if (price && price !== '0' && price !== '' && !price.includes(',')) {
+                            price = price + ',-';
+                        }
+                        
+                        console.log('KAB: Formatted price: ' + price);
+                        self.$form.find('.kab-summary-price').text(price);
+                    } else {
+                        console.log('KAB: Price API returned error or no price data:', response);
+                        self.$form.find('.kab-summary-price').text('0');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.log('KAB: Price API request failed:', status, error);
+                    console.log('KAB: Response:', xhr.responseText);
+                    self.$form.find('.kab-summary-price').text('0');
+                }
+            });
         }
         
         /**

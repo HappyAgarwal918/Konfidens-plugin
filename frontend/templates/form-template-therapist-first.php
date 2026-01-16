@@ -148,7 +148,7 @@ $form_classes[] = 'kab-context-' . $context;
                             </div>
                             <div class="kab-summary-item kab-summary-price-item">
                                 <div class="kab-summary-label"><?php _e('Pris:', 'konfidens-appointment-booking'); ?></div>
-                                <div class="kab-summary-value kab-summary-price"></div>
+                                <div class="kab-summary-value kab-summary-price"><?php _e('Loading...', 'konfidens-appointment-booking'); ?></div>
                             </div>
                         </div>
                     </div>
@@ -156,17 +156,14 @@ $form_classes[] = 'kab-context-' . $context;
                     <!-- Right column: Personal details form -->
                     <div class="kab-personal-details">
                         <div class="kab-form-group">
-                            <label for="kab-first-name-tf"><?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?></label>
                             <input type="text" id="kab-first-name-tf" name="first_name" required placeholder="<?php _e('Fornavnet ditt', 'konfidens-appointment-booking'); ?>">
                         </div>
                         
                         <div class="kab-form-group">
-                            <label for="kab-email-tf"><?php _e('Din e-post', 'konfidens-appointment-booking'); ?></label>
                             <input type="email" id="kab-email-tf" name="email" required placeholder="<?php _e('Din e-post', 'konfidens-appointment-booking'); ?>">
                         </div>
                         
                         <div class="kab-form-group">
-                            <label for="kab-phone-tf"><?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?></label>
                             <input type="tel" id="kab-phone-tf" name="phone" required placeholder="<?php _e('Telefonnummeret ditt', 'konfidens-appointment-booking'); ?>">
                         </div>
                         

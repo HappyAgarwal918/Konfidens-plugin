@@ -553,6 +553,7 @@
                 data: {
                     action: 'kab_get_locations_by_category',
                     category_id: this.categoryId,
+                    therapist_id: this.therapistId || '', // Filter locations to only those where therapist provides service
                     nonce: kab_vars.nonce,
                     service_set_id: this.serviceSetId || ''
                 },
@@ -1039,6 +1040,7 @@
                         action: 'kab_get_service_by_category_location',
                         category_id: this.categoryId,
                         location_id: locationId,
+                        therapist_id: this.therapistId || '', // Validate therapist provides this service
                         nonce: kab_vars.nonce
                     },
                     success: function(response) {
@@ -1060,21 +1062,50 @@
                                 }, 300); // Small delay for visual feedback
                             }
                         } else {
-                            // Service not found - show error but still allow to proceed
-                            if (autoAdvance) {
-                                setTimeout(() => {
-                                    self.nextStep();
-                                }, 300);
+                            // Service not found or therapist doesn't provide this service
+                            const errorMsg = response.data && response.data.message 
+                                ? response.data.message 
+                                : 'Service not available for this combination.';
+                            
+                            // Show error message
+                            const $locationsList = self.$form.find('.kab-locations-list');
+                            $locationsList.prepend('<div class="kab-error-message" style="background: #fee; color: #c33; padding: 10px; margin-bottom: 10px; border-radius: 4px;">' + errorMsg + '</div>');
+                            
+                            // Remove error message after 5 seconds
+                            setTimeout(() => {
+                                $locationsList.find('.kab-error-message').fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            }, 5000);
+                            
+                            // Clear location selection if therapist doesn't provide the service
+                            if (response.data && response.data.therapist_invalid) {
+                                self.locationId = '';
+                                self.serviceId = '';
+                                self.$form.find('.kab-category-item[data-location-id]').removeClass('selected');
+                            }
+                            
+                            // Don't proceed if therapist doesn't provide the service
+                            if (!response.data || !response.data.therapist_invalid) {
+                                if (autoAdvance) {
+                                    setTimeout(() => {
+                                        self.nextStep();
+                                    }, 300);
+                                }
                             }
                         }
                     },
                     error: function() {
-                        // Error getting service - still allow to proceed
-                        if (autoAdvance) {
-                            setTimeout(() => {
-                                self.nextStep();
-                            }, 300);
-                        }
+                        // Error getting service - show error message
+                        const $locationsList = self.$form.find('.kab-locations-list');
+                        $locationsList.prepend('<div class="kab-error-message" style="background: #fee; color: #c33; padding: 10px; margin-bottom: 10px; border-radius: 4px;">Error loading service. Please try again.</div>');
+                        
+                        // Remove error message after 5 seconds
+                        setTimeout(() => {
+                            $locationsList.find('.kab-error-message').fadeOut(300, function() {
+                                $(this).remove();
+                            });
+                        }, 5000);
                     }
                 });
             } else {
@@ -1226,27 +1257,65 @@
                 }
             }
             
-            // Get price from stored service data
-            let price = '0';
-            if (this.serviceId && this.services.length > 0) {
-                const selectedService = this.services.find(service => service.id === this.serviceId);
-                if (selectedService && selectedService.price) {
-                    price = selectedService.price || '0';
-                    if (price && price !== '0' && !price.includes(',')) {
-                        price = price + ',-';
-                    }
-                } else if (selectedService) {
-                    price = selectedService.price || '0';
-                }
-            }
-            
             // Update summary fields
             this.$form.find('.kab-summary-therapist').text(therapistName);
             this.$form.find('.kab-summary-service').text(serviceName);
             this.$form.find('.kab-summary-location').text(locationName);
             this.$form.find('.kab-summary-date').text(formattedDate);
             this.$form.find('.kab-summary-time').text(formattedTime);
-            this.$form.find('.kab-summary-price').text(price);
+            
+            // Fetch and display price from API
+            this.loadServicePrice();
+        }
+        
+        /**
+         * Load service price from API
+         */
+        loadServicePrice() {
+            const self = this;
+            
+            if (!this.serviceId) {
+                console.log('KAB: No service ID - cannot fetch price');
+                this.$form.find('.kab-summary-price').text('0');
+                return;
+            }
+            
+            console.log('KAB: Fetching price for service ID: ' + this.serviceId);
+            this.$form.find('.kab-summary-price').text('Loading...');
+            
+            $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'kab_get_service_price',
+                    service_id: this.serviceId,
+                    nonce: kab_vars.nonce
+                },
+                success: function(response) {
+                    console.log('KAB: Price API response:', response);
+                    
+                    if (response.success && response.data && response.data.price !== undefined) {
+                        let price = response.data.price;
+                        console.log('KAB: Received price from API: ' + price);
+                        
+                        // Format price (add comma and dash if needed)
+                        if (price && price !== '0' && price !== '' && !price.includes(',')) {
+                            price = price + ',-';
+                        }
+                        
+                        console.log('KAB: Formatted price: ' + price);
+                        self.$form.find('.kab-summary-price').text(price);
+                    } else {
+                        console.log('KAB: Price API returned error or no price data:', response);
+                        self.$form.find('.kab-summary-price').text('0');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.log('KAB: Price API request failed:', status, error);
+                    console.log('KAB: Response:', xhr.responseText);
+                    self.$form.find('.kab-summary-price').text('0');
+                }
+            });
         }
         
         /**
