@@ -32,15 +32,15 @@ function kab_display_services_page() {
     // Get locations
     $locations = kab_get_locations();
     
+    // Get all location categories for lookup
+    $location_categories = kab_get_location_categories();
+    $location_categories_map = array();
+    foreach ($location_categories as $loc_cat) {
+        $location_categories_map[$loc_cat->id] = $loc_cat->category_name;
+    }
+    
     // Get all service categories for dropdown
     $service_categories = kab_get_service_categories();
-    
-    // Get all parent categories for lookup
-    $parent_categories = kab_get_service_parent_categories();
-    $parent_categories_map = array();
-    foreach ($parent_categories as $parent_cat) {
-        $parent_categories_map[$parent_cat->id] = $parent_cat->parent_category_name;
-    }
     
     ?>
     <div class="wrap kab-admin kab-services-page">
@@ -195,13 +195,19 @@ function kab_display_services_page() {
                                         <?php if (empty($locations)): ?>
                                             <span style="color: #999;"><?php _e('No locations available', 'konfidens-appointment-booking'); ?></span>
                                         <?php else: ?>
-                                            <?php foreach ($locations as $location): ?>
+                                            <?php foreach ($locations as $location): 
+                                                // Get location category name if exists
+                                                $display_name = esc_html($location->location_name);
+                                                if (!empty($location->category_id) && isset($location_categories_map[$location->category_id])) {
+                                                    $display_name .= ' (' . esc_html($location_categories_map[$location->category_id]) . ')';
+                                                }
+                                            ?>
                                                 <label style="display: block; margin: 5px 0;">
                                                     <input type="checkbox" 
                                                            class="kab-service-location-checkbox" 
                                                            value="<?php echo esc_attr($location->id); ?>"
                                                            <?php checked(in_array((string)$location->id, $service_location_ids_array)); ?>>
-                                                    <?php echo esc_html($location->location_name); ?>
+                                                    <?php echo $display_name; ?>
                                                 </label>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
@@ -213,15 +219,9 @@ function kab_display_services_page() {
                                 <td>
                                     <select class="kab-service-category-select" data-service-id="<?php echo esc_attr($service['id']); ?>" style="max-width: 100%;">
                                         <option value=""><?php _e('-- No Category --', 'konfidens-appointment-booking'); ?></option>
-                                        <?php foreach ($service_categories as $category): 
-                                            // Get parent category name if exists
-                                            $display_name = esc_html($category->category_name);
-                                            if (!empty($category->parent_category_id) && isset($parent_categories_map[$category->parent_category_id])) {
-                                                $display_name .= ' (' . esc_html($parent_categories_map[$category->parent_category_id]) . ')';
-                                            }
-                                        ?>
+                                        <?php foreach ($service_categories as $category): ?>
                                             <option value="<?php echo esc_attr($category->id); ?>" <?php selected($service_category_id, $category->id); ?>>
-                                                <?php echo $display_name; ?>
+                                                <?php echo esc_html($category->category_name); ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
