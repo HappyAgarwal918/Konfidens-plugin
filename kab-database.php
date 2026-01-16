@@ -286,18 +286,28 @@ function kab_delete_location($id) {
     $location_service_table = $wpdb->prefix . 'kab_location_service';
     
     // First, remove the deleted location ID from all service assignments
-    // Get all service records that have this location ID (services now only have one location)
-    $all_services = $wpdb->get_results($wpdb->prepare(
-        "SELECT service_id, location_ids FROM $location_service_table WHERE location_ids = %s",
-        $id
-    ));
+    // Get all service records that have this location ID (handle comma-separated location_ids)
+    $all_services = $wpdb->get_results(
+        "SELECT service_id, location_ids FROM $location_service_table WHERE location_ids != '' AND location_ids IS NOT NULL"
+    );
     
     foreach ($all_services as $service) {
-        // Clear the location_id since it matches the deleted location
-        $wpdb->query($wpdb->prepare(
-            "UPDATE $location_service_table SET location_ids = '' WHERE service_id = %s",
-            $service->service_id
-        ));
+        if (!empty($service->location_ids)) {
+            // Split comma-separated location IDs
+            $location_ids = array_map('trim', explode(',', $service->location_ids));
+            // Remove the deleted location ID
+            $location_ids = array_filter($location_ids, function($loc_id) use ($id) {
+                return $loc_id != $id;
+            });
+            
+            // Update with remaining location IDs (or empty string if none remain)
+            $updated_location_ids = !empty($location_ids) ? implode(',', $location_ids) : '';
+            $wpdb->query($wpdb->prepare(
+                "UPDATE $location_service_table SET location_ids = %s WHERE service_id = %s",
+                $updated_location_ids,
+                $service->service_id
+            ));
+        }
     }
     
     // Then delete the location
@@ -305,7 +315,7 @@ function kab_delete_location($id) {
 }
 
 /**
- * Get service locations
+ * Get service locations (returns comma-separated location IDs)
  */
 function kab_get_service_locations($service_id) {
     global $wpdb;
@@ -314,7 +324,7 @@ function kab_get_service_locations($service_id) {
     $service_location = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service_id));
     
     if ($service_location && !empty($service_location->location_ids)) {
-        // Return single location_id (services now only have one location)
+        // Return comma-separated location IDs (e.g., "1,2,3")
         return $service_location->location_ids;
     }
     
@@ -356,13 +366,16 @@ function kab_get_locations_by_category($category_id) {
         return array();
     }
     
-    // Collect all unique location IDs (services now only have one location)
+    // Collect all unique location IDs (handle comma-separated location_ids)
     $location_ids = array();
     foreach ($services as $service) {
         if (!empty($service->location_ids)) {
-            $loc_id = trim($service->location_ids);
-            if (!empty($loc_id) && !in_array($loc_id, $location_ids)) {
-                $location_ids[] = $loc_id;
+            // Split comma-separated location IDs
+            $loc_ids = array_map('trim', explode(',', $service->location_ids));
+            foreach ($loc_ids as $loc_id) {
+                if (!empty($loc_id) && !in_array($loc_id, $location_ids)) {
+                    $location_ids[] = $loc_id;
+                }
             }
         }
     }
@@ -387,15 +400,24 @@ function kab_get_service_by_category_location($category_id, $location_id) {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_location_service';
     
-    // Get service in this category with the requested location (services now only have one location)
-    $service = $wpdb->get_row($wpdb->prepare(
-        "SELECT service_id FROM $table_name WHERE category_id = %d AND location_ids = %s",
-        intval($category_id),
-        $location_id
+    // Get all services in this category
+    $services = $wpdb->get_results($wpdb->prepare(
+        "SELECT service_id, location_ids FROM $table_name WHERE category_id = %d",
+        intval($category_id)
     ));
     
-    if ($service && !empty($service->service_id)) {
-        return $service->service_id;
+    if (empty($services)) {
+        return null;
+    }
+    
+    // Check if any service has the requested location_id in its comma-separated location_ids
+    foreach ($services as $service) {
+        if (!empty($service->location_ids)) {
+            $loc_ids = array_map('trim', explode(',', $service->location_ids));
+            if (in_array((string)$location_id, $loc_ids)) {
+                return $service->service_id;
+            }
+        }
     }
     
     return null;

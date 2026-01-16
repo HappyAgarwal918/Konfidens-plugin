@@ -865,6 +865,14 @@
 }
 
 /* Confirmation Page */
+.kab-success-title, .kab-error-title {
+    font-family: "Playfair Display", Sans-serif;
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.2px;
+    color: #1D1C1F;
+}
+
 .kab-confirmation-message {
     text-align: center;
     padding: 30px 0;
@@ -872,33 +880,16 @@
 
 .kab-success-icon,
 .kab-error-icon {
-    width: 80px;
-    height: 80px;
     margin: 0 auto 20px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
-.kab-success-icon img {
+.kab-success-icon img, .kab-error-icon img {
     align-items: center;
 }
 
-.kab-error-icon {
-    background-color: var(--kab-error-color);
-    color: var(--kab-white);
-}
-
-.kab-booking-details {
-    margin-top: 20px;
-    text-align: left;
-    max-width: 400px;
-    margin-left: auto;
-    margin-right: auto;
-    border: 1px solid var(--kab-border-color);
-    border-radius: var(--kab-border-radius);
-    padding: 15px;
-}
 
 .kab-booking-info-item {
     margin-bottom: 10px;
@@ -909,10 +900,14 @@
     margin-right: 5px;
 }
 
-.kab-booking-message {
+.kab-booking-message, .kab-error-message {
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
     margin: 20px 0;
-    color: var(--kab-gray);
-    line-height: 1.6;
+    color: #1D1C1F;
 }
 
 .kab-confirmation-buttons {
@@ -926,23 +921,28 @@
 }
 
 .kab-book-new-btn,
-.kab-close-window-btn {
-    padding: 12px 30px;
-    border-radius: var(--kab-border-radius);
-    font-size: 16px;
-    font-weight: 500;
+.kab-close-window-btn,
+.kab-try-again-btn {
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
     cursor: pointer;
     transition: all 0.3s ease;
-    border: none;
-    font-family: inherit;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 12px 30px !important;
 }
 
-.kab-book-new-btn {
+.kab-book-new-btn,
+.kab-try-again-btn {
     background-color: var(--kab-primary-color);
     color: var(--kab-white);
 }
 
-.kab-book-new-btn:hover {
+.kab-book-new-btn:hover,
+.kab-try-again-btn:hover {
     background-color: var(--kab-primary-color-dark);
 }
 

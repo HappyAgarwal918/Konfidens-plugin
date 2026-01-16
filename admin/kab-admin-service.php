@@ -35,6 +35,13 @@ function kab_display_services_page() {
     // Get all service categories for dropdown
     $service_categories = kab_get_service_categories();
     
+    // Get all parent categories for lookup
+    $parent_categories = kab_get_service_parent_categories();
+    $parent_categories_map = array();
+    foreach ($parent_categories as $parent_cat) {
+        $parent_categories_map[$parent_cat->id] = $parent_cat->parent_category_name;
+    }
+    
     ?>
     <div class="wrap kab-admin kab-services-page">
         <h1><?php _e('Konfidens Services', 'konfidens-appointment-booking'); ?></h1>
@@ -97,7 +104,9 @@ function kab_display_services_page() {
                         
                         foreach ($services as $service): 
                             // Get service location and category from lookup arrays (fast, no database query)
-                            $service_location_id = isset($service_locations_map[$service['id']]) ? $service_locations_map[$service['id']] : '';
+                            $service_location_ids = isset($service_locations_map[$service['id']]) ? $service_locations_map[$service['id']] : '';
+                            // Parse comma-separated location IDs into array
+                            $service_location_ids_array = !empty($service_location_ids) ? array_map('trim', explode(',', $service_location_ids)) : array();
                             $service_category_id = isset($service_categories_map[$service['id']]) ? $service_categories_map[$service['id']] : null;
                             // Get price from API only
                             // Helper function to extract price (handles arrays and objects)
@@ -182,14 +191,21 @@ function kab_display_services_page() {
                                 <td><?php echo esc_html($service['name']); ?></td>
                                 <td><?php echo esc_html($count); ?></td>
                                 <td>
-                                    <select class="kab-service-location-select" data-service-id="<?php echo esc_attr($service['id']); ?>" style="max-width: 100%;">
-                                        <option value=""><?php _e('-- No Location --', 'konfidens-appointment-booking'); ?></option>
-                                        <?php foreach ($locations as $location): ?>
-                                            <option value="<?php echo esc_attr($location->id); ?>" <?php selected($service_location_id, $location->id); ?>>
-                                                <?php echo esc_html($location->location_name); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
+                                    <div class="kab-service-location-checkboxes" data-service-id="<?php echo esc_attr($service['id']); ?>" style="max-width: 100%;">
+                                        <?php if (empty($locations)): ?>
+                                            <span style="color: #999;"><?php _e('No locations available', 'konfidens-appointment-booking'); ?></span>
+                                        <?php else: ?>
+                                            <?php foreach ($locations as $location): ?>
+                                                <label style="display: block; margin: 5px 0;">
+                                                    <input type="checkbox" 
+                                                           class="kab-service-location-checkbox" 
+                                                           value="<?php echo esc_attr($location->id); ?>"
+                                                           <?php checked(in_array((string)$location->id, $service_location_ids_array)); ?>>
+                                                    <?php echo esc_html($location->location_name); ?>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
                                     <span class="kab-service-location-save-status" id="service-save-status-<?php echo esc_attr($service['id']); ?>" style="display: none; margin-left: 10px; color: green; font-style: italic;">
                                         <?php _e('Saved!', 'konfidens-appointment-booking'); ?>
                                     </span>
@@ -197,9 +213,15 @@ function kab_display_services_page() {
                                 <td>
                                     <select class="kab-service-category-select" data-service-id="<?php echo esc_attr($service['id']); ?>" style="max-width: 100%;">
                                         <option value=""><?php _e('-- No Category --', 'konfidens-appointment-booking'); ?></option>
-                                        <?php foreach ($service_categories as $category): ?>
+                                        <?php foreach ($service_categories as $category): 
+                                            // Get parent category name if exists
+                                            $display_name = esc_html($category->category_name);
+                                            if (!empty($category->parent_category_id) && isset($parent_categories_map[$category->parent_category_id])) {
+                                                $display_name .= ' (' . esc_html($parent_categories_map[$category->parent_category_id]) . ')';
+                                            }
+                                        ?>
                                             <option value="<?php echo esc_attr($category->id); ?>" <?php selected($service_category_id, $category->id); ?>>
-                                                <?php echo esc_html($category->category_name); ?>
+                                                <?php echo $display_name; ?>
                                             </option>
                                         <?php endforeach; ?>
                                     </select>
@@ -230,10 +252,20 @@ function kab_display_services_page() {
             }
             
             jQuery(document).ready(function($) {
-                // Location dropdown selection
-                $('.kab-service-location-select').on('change', function() {
-                    var serviceId = $(this).data('service-id');
-                    var locationId = $(this).val();
+                // Location checkbox selection
+                $('.kab-service-location-checkbox').on('change', function() {
+                    var $container = $(this).closest('.kab-service-location-checkboxes');
+                    var serviceId = $container.data('service-id');
+                    var locationCheckboxes = $container.find('.kab-service-location-checkbox');
+                    var selectedLocations = [];
+                    
+                    locationCheckboxes.each(function() {
+                        if ($(this).is(':checked')) {
+                            selectedLocations.push($(this).val());
+                        }
+                    });
+                    
+                    var locationIds = selectedLocations.join(',');
                     var saveStatus = $('#service-save-status-' + serviceId);
                     
                     // Show saving indicator
@@ -245,7 +277,7 @@ function kab_display_services_page() {
                         data: {
                             action: 'kab_update_service_locations',
                             service_id: serviceId,
-                            location_id: locationId,
+                            location_ids: locationIds,
                             nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
                         },
                         success: function(response) {
@@ -412,7 +444,7 @@ function kab_get_services_with_priority() {
 
 
 /**
- * AJAX handler for updating service location (single location only)
+ * AJAX handler for updating service locations (multiple locations supported)
  */
 function kab_update_service_locations() {
     // Check nonce
@@ -431,15 +463,16 @@ function kab_update_service_locations() {
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
-    $location_id = isset($_POST['location_id']) ? sanitize_text_field($_POST['location_id']) : '';
+    // Accept location_ids (comma-separated) or location_id (single, for backward compatibility)
+    $location_ids = isset($_POST['location_ids']) ? sanitize_text_field($_POST['location_ids']) : (isset($_POST['location_id']) ? sanitize_text_field($_POST['location_id']) : '');
     
-    // Update service location (single location only)
-    $result = kab_add_update_service_location($service_id, $location_id);
+    // Update service locations (comma-separated IDs)
+    $result = kab_add_update_service_location($service_id, $location_ids);
     
     if ($result !== false) {
-        wp_send_json_success(array('message' => __('Service location updated successfully.', 'konfidens-appointment-booking')));
+        wp_send_json_success(array('message' => __('Service locations updated successfully.', 'konfidens-appointment-booking')));
     } else {
-        wp_send_json_error(array('message' => __('Failed to update service location.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Failed to update service locations.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_update_service_locations', 'kab_update_service_locations');
@@ -468,20 +501,20 @@ function kab_update_service_category_assignment_ajax() {
     // Convert to integer if set, otherwise null (allow clearing category)
     $category_id = ($category_id_input !== '' && $category_id_input !== null && $category_id_input !== '0') ? intval($category_id_input) : null;
     
-    // Get existing location to preserve it (single location only)
-    $location_id = kab_get_service_locations($service_id);
+    // Get existing location IDs to preserve them (comma-separated)
+    $location_ids = kab_get_service_locations($service_id);
     
     // Ensure service entry exists (create if it doesn't)
     $existing_location_check = kab_get_service_locations($service_id);
-    if (empty($existing_location_check) && $location_id === '') {
-        // Service entry doesn't exist, create it first with empty location_id
+    if (empty($existing_location_check) && $location_ids === '') {
+        // Service entry doesn't exist, create it first with empty location_ids
         kab_add_update_service_location($service_id, '', $category_id);
         // Re-fetch location after creation
-        $location_id = kab_get_service_locations($service_id);
+        $location_ids = kab_get_service_locations($service_id);
     }
     
-    // Update service category assignment (preserve single location)
-    $result = kab_add_update_service_location($service_id, $location_id, $category_id);
+    // Update service category assignment (preserve location IDs)
+    $result = kab_add_update_service_location($service_id, $location_ids, $category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service category updated successfully.', 'konfidens-appointment-booking')));

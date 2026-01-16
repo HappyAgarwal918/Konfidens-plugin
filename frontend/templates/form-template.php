@@ -186,19 +186,20 @@ $form_classes[] = 'kab-context-' . $context;
                     <div class="kab-loading"><?php _e('Processing your booking...', 'konfidens-appointment-booking'); ?></div>
                     <div class="kab-success" style="display: none;">
                         <div class="kab-success-icon">
-                            <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
+                            <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'Illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
                         </div>
-                        <h3><?php _e('Du har bestilt din samtale!', 'konfidens-appointment-booking'); ?></h3>
+                        <h3 class="kab-success-title"><?php _e('Du har bestilt din samtale!', 'konfidens-appointment-booking'); ?></h3>
                         <p class="kab-booking-message"><?php _e('Vi har sendt deg en bekreftelse på e-post. Vennligst sjekk innboksen din for å bekrefte at alle opplysningene stemmer.', 'konfidens-appointment-booking'); ?></p>
-                        <div class="kab-booking-details"></div>
                         <div class="kab-confirmation-buttons">
                             <button class="kab-book-new-btn"><?php _e('Bestill en ny time', 'konfidens-appointment-booking'); ?></button>
                             <button class="kab-close-window-btn"><?php _e('Lukk vindu', 'konfidens-appointment-booking'); ?></button>
                         </div>
                     </div>
                     <div class="kab-error" style="display: none;">
-                        <div class="kab-error-icon">✗</div>
-                        <h3><?php _e('Booking Failed', 'konfidens-appointment-booking'); ?></h3>
+                        <div class="kab-error-icon">
+                            <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
+                        </div>
+                        <h3 class="kab-error-title"><?php _e('Booking Failed', 'konfidens-appointment-booking'); ?></h3>
                         <p class="kab-error-message"></p>
                         <button class="kab-try-again-btn"><?php _e('Try Again', 'konfidens-appointment-booking'); ?></button>
                     </div>

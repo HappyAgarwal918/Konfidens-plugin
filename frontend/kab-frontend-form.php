@@ -59,21 +59,26 @@ function kab_get_locations_by_service_set($set_id) {
     $service_ids = array_map('sanitize_text_field', $service_set['service_ids']);
     $service_ids_str = "'" . implode("','", $service_ids) . "'";
     
-    $location_ids = $wpdb->get_col(
+    $location_ids_rows = $wpdb->get_col(
         "SELECT DISTINCT location_ids FROM $location_service_table 
          WHERE service_id IN ($service_ids_str) AND location_ids != '' AND location_ids IS NOT NULL"
     );
     
-    if (empty($location_ids)) {
+    if (empty($location_ids_rows)) {
         return array();
     }
     
-    // Filter out empty values and get unique IDs
+    // Filter out empty values and get unique IDs (handle comma-separated location_ids)
     $unique_location_ids = array();
-    foreach ($location_ids as $loc_id) {
-        $loc_id = trim($loc_id);
-        if (!empty($loc_id) && !in_array($loc_id, $unique_location_ids)) {
-            $unique_location_ids[] = $loc_id;
+    foreach ($location_ids_rows as $loc_ids_str) {
+        if (!empty($loc_ids_str)) {
+            // Split comma-separated location IDs
+            $loc_ids = array_map('trim', explode(',', $loc_ids_str));
+            foreach ($loc_ids as $loc_id) {
+                if (!empty($loc_id) && !in_array($loc_id, $unique_location_ids)) {
+                    $unique_location_ids[] = $loc_id;
+                }
+            }
         }
     }
     
@@ -495,15 +500,21 @@ function kab_get_locations_ajax() {
     
     $service_id = sanitize_text_field($_POST['service_id']);
     
-    // Get service location (single location only)
-    $service_location_id = kab_get_service_locations($service_id);
+    // Get service locations (comma-separated location IDs)
+    $service_location_ids = kab_get_service_locations($service_id);
     
-    if (!empty($service_location_id)) {
+    if (!empty($service_location_ids)) {
         $locations = array();
-        $location = kab_get_location_by_id($service_location_id);
+        // Split comma-separated location IDs
+        $location_ids_array = array_map('trim', explode(',', $service_location_ids));
         
-        if ($location) {
-            $locations[] = $location;
+        foreach ($location_ids_array as $location_id) {
+            if (!empty($location_id)) {
+                $location = kab_get_location_by_id($location_id);
+                if ($location) {
+                    $locations[] = $location;
+                }
+            }
         }
         
         if (!empty($locations)) {
@@ -1003,15 +1014,21 @@ function kab_get_locations_for_therapist_service_ajax() {
     $service_id = sanitize_text_field($_POST['service_id']);
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
     
-    // Get service location (single location only, therapist location filtering removed)
-    $service_location_id = kab_get_service_locations($service_id);
+    // Get service locations (comma-separated location IDs, therapist location filtering removed)
+    $service_location_ids = kab_get_service_locations($service_id);
     
-    if (!empty($service_location_id)) {
+    if (!empty($service_location_ids)) {
         $locations = array();
-        $location = kab_get_location_by_id($service_location_id);
+        // Split comma-separated location IDs
+        $location_ids_array = array_map('trim', explode(',', $service_location_ids));
         
-        if ($location) {
-            $locations[] = $location;
+        foreach ($location_ids_array as $location_id) {
+            if (!empty($location_id)) {
+                $location = kab_get_location_by_id($location_id);
+                if ($location) {
+                    $locations[] = $location;
+                }
+            }
         }
         
         if (!empty($locations)) {

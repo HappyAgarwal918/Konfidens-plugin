@@ -1451,18 +1451,6 @@
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message || 'Booking created successfully.');
                         
-                        // Build booking details for display
-                        let bookingDetails = '';
-                        if (response.data.booking_id) {
-                            bookingDetails += `
-                                <div class="kab-booking-info-item">
-                                    <span class="kab-booking-info-label">Booking ID:</span>
-                                    <span class="kab-booking-info-value">${response.data.booking_id}</span>
-                                </div>
-                            `;
-                        }
-                        $success.find('.kab-booking-details').html(bookingDetails);
-                        
                         // No redirect - stay on confirmation step
                     } else {
                         $error.show();
