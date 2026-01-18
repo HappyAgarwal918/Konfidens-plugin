@@ -466,8 +466,11 @@ function kab_update_service_locations() {
     // Accept location_ids (comma-separated) or location_id (single, for backward compatibility)
     $location_ids = isset($_POST['location_ids']) ? sanitize_text_field($_POST['location_ids']) : (isset($_POST['location_id']) ? sanitize_text_field($_POST['location_id']) : '');
     
-    // Update service locations (comma-separated IDs)
-    $result = kab_add_update_service_location($service_id, $location_ids);
+    // Preserve existing category_id when updating locations
+    $existing_category_id = kab_get_service_category_id($service_id);
+    
+    // Update service locations (comma-separated IDs) while preserving category_id
+    $result = kab_add_update_service_location($service_id, $location_ids, $existing_category_id);
     
     if ($result !== false) {
         wp_send_json_success(array('message' => __('Service locations updated successfully.', 'konfidens-appointment-booking')));

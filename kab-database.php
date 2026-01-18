@@ -747,6 +747,8 @@ function kab_import_services($services) {
     }
     
     $imported = 0;
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_service';
     
     // Import each service
     foreach ($services as $service) {
@@ -754,20 +756,20 @@ function kab_import_services($services) {
             continue;
         }
         
-        // Check if service already exists in database
-        $existing_location = kab_get_service_locations($service['id']);
+        // Check if service already exists in database - get full record to preserve both location_ids and category_id
+        $existing_record = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE service_id = %s", $service['id']));
         
-        // Only update if service doesn't exist yet
-        if (empty($existing_location)) {
-            // Service doesn't exist - create entry with blank location
+        // Only create entry if service doesn't exist yet
+        if (empty($existing_record)) {
+            // Service doesn't exist - create entry with blank location and no category
             $result = kab_add_update_service_location($service['id'], '');
             
             if ($result !== false) {
                 $imported++;
             }
         } else {
-            // Service already exists - preserve existing locations
-            // Just count it as imported/updated
+            // Service already exists - preserve existing locations AND category_id
+            // Don't update anything, just count it as imported/updated
             $imported++;
         }
     }

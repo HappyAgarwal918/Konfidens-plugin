@@ -5,8 +5,19 @@ if (!defined('ABSPATH')) {
 
 // Plugin activation: Create tables, set defaults, flush rewrite rules
 function kab_activate() {
-    kab_create_tables();
-    kab_set_default_options();
+    // Get current database version
+    $db_version = get_option('kab_db_version', '0');
+    $plugin_version = defined('KAB_VERSION') ? KAB_VERSION : '1.1.7';
+    
+    // Only run full activation on first install or if database version is outdated
+    if (version_compare($db_version, $plugin_version, '<')) {
+        kab_create_tables();
+        kab_set_default_options();
+        
+        // Update database version to current plugin version
+        update_option('kab_db_version', $plugin_version);
+    }
+    
     flush_rewrite_rules();
 }
 

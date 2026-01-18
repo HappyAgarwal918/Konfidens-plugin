@@ -599,7 +599,16 @@
                                 const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
                                 
                                 if (hasCategorizedLocations) {
-                                    // Render categorized locations in collapsible groups
+                                    // Add uncategorized locations first (without category grouping)
+                                    if (uncategorizedLocations.length > 0) {
+                                        html += uncategorizedLocations.map(location => 
+                                            `<div class="kab-category-item" data-location-id="${location.id}">
+                                                <p class="kab-category-name">${location.location_name}</p>
+                                            </div>`
+                                        ).join('');
+                                    }
+                                    
+                                    // Render categorized locations in collapsible groups (after uncategorized)
                                     Object.values(locationsByCategory).forEach(catData => {
                                         if (catData.locations.length > 0) {
                                             html += `<div class="kab-category-group">
@@ -617,15 +626,6 @@
                                             </div>`;
                                         }
                                     });
-                                    
-                                    // Add uncategorized locations directly (without category grouping)
-                                    if (uncategorizedLocations.length > 0) {
-                                        html += uncategorizedLocations.map(location => 
-                                            `<div class="kab-category-item" data-location-id="${location.id}">
-                                                <p class="kab-category-name">${location.location_name}</p>
-                                            </div>`
-                                        ).join('');
-                                    }
                                 } else {
                                     // No location categories, render all locations directly
                                     html = availableLocations.map(location => 
@@ -698,6 +698,16 @@
             const hasCategorizedLocations = Object.values(locationsByCategory).some(catData => catData.locations.length > 0);
             
             if (hasCategorizedLocations) {
+                // Add uncategorized locations first (without category grouping)
+                if (uncategorizedLocations.length > 0) {
+                    html += uncategorizedLocations.map(location => 
+                        `<div class="kab-category-item" data-location-id="${location.id}">
+                            <p class="kab-category-name">${location.location_name}</p>
+                        </div>`
+                    ).join('');
+                }
+                
+                // Render categorized locations in collapsible groups (after uncategorized)
                 Object.values(locationsByCategory).forEach(catData => {
                     if (catData.locations.length > 0) {
                         html += `<div class="kab-category-group">
@@ -715,14 +725,6 @@
                         </div>`;
                     }
                 });
-                
-                if (uncategorizedLocations.length > 0) {
-                    html += uncategorizedLocations.map(location => 
-                        `<div class="kab-category-item" data-location-id="${location.id}">
-                            <p class="kab-category-name">${location.location_name}</p>
-                        </div>`
-                    ).join('');
-                }
             } else {
                 html = locations.map(location => 
                     `<div class="kab-category-item" data-location-id="${location.id}">
