@@ -105,7 +105,6 @@ function kab_create_tables() {
     $location_specialist_table = $wpdb->prefix . 'kab_location_specialist';
     $wpdb->query("CREATE TABLE IF NOT EXISTS $location_specialist_table (
         id int(11) NOT NULL AUTO_INCREMENT,
-        location_ids text NOT NULL,
         specialist_id varchar(50) NOT NULL,
         tags text DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
@@ -688,15 +687,26 @@ function kab_update_specialist_tags($specialist_id, $tags) {
         // wpdb->update returns number of rows affected (0 or more), false on error
         return $result !== false;
     } else {
-        // If no record exists, create one with empty location_ids
+        // Check if location_ids column exists (it's deprecated but may exist in some installations)
+        $location_ids_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'location_ids'");
+        
+        // If no record exists, create one
+        // Only include location_ids if the column exists (for backward compatibility)
+        $insert_data = array(
+            'specialist_id' => sanitize_text_field($specialist_id),
+            'tags' => $tags_string
+        );
+        $insert_format = array('%s', '%s');
+        
+        if (!empty($location_ids_column_exists)) {
+            $insert_data['location_ids'] = '';
+            $insert_format[] = '%s';
+        }
+        
         $result = $wpdb->insert(
             $table_name,
-            array(
-                'specialist_id' => sanitize_text_field($specialist_id),
-                'location_ids' => '',
-                'tags' => $tags_string
-            ),
-            array('%s', '%s', '%s')
+            $insert_data,
+            $insert_format
         );
         
         return $result !== false;

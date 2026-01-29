@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.1.7
+ * Version: 1.1.8
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('KAB_VERSION', '1.1.7');
+define('KAB_VERSION', '1.1.8');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -59,9 +59,69 @@ function kab_deactivate() {
     flush_rewrite_rules();
 }
 
+
+// Get the correct "From" email address for SMTP compatibility
+function kab_get_from_email() {
+    // Try to get from WP Mail SMTP plugin
+    if (function_exists('wp_mail_smtp')) {
+        $options = get_option('wp_mail_smtp', array());
+        if (!empty($options['mail']['from_email'])) {
+            return $options['mail']['from_email'];
+        }
+    }
+    
+    // Try to get from Easy WP SMTP
+    $easy_smtp = get_option('swpsmtp_options', array());
+    if (!empty($easy_smtp['from_email_field'])) {
+        return $easy_smtp['from_email_field'];
+    }
+    
+    // Try to get from Post SMTP
+    $post_smtp = get_option('postman_options', array());
+    if (!empty($post_smtp['sender_email'])) {
+        return $post_smtp['sender_email'];
+    }
+    
+    // Try to get from PHPMailer global (if available)
+    global $phpmailer;
+    if (isset($phpmailer) && is_object($phpmailer) && !empty($phpmailer->From)) {
+        return $phpmailer->From;
+    }
+    
+    // Fallback to admin email
+    return get_option('admin_email');
+}
+
+// Get the correct "From" name for SMTP compatibility
+function kab_get_from_name() {
+    // Try to get from WP Mail SMTP plugin
+    if (function_exists('wp_mail_smtp')) {
+        $options = get_option('wp_mail_smtp', array());
+        if (!empty($options['mail']['from_name'])) {
+            return $options['mail']['from_name'];
+        }
+    }
+    
+    // Try to get from Easy WP SMTP
+    $easy_smtp = get_option('swpsmtp_options', array());
+    if (!empty($easy_smtp['from_name_field'])) {
+        return $easy_smtp['from_name_field'];
+    }
+    
+    // Try to get from Post SMTP
+    $post_smtp = get_option('postman_options', array());
+    if (!empty($post_smtp['sender_name'])) {
+        return $post_smtp['sender_name'];
+    }
+    
+    // Fallback to site name
+    return get_bloginfo('name');
+}
+
 function kab_admin_enqueue_scripts() {
     $screen = get_current_screen();
-    if (strpos($screen->id, 'kab') !== false) {
+    // Check for both 'kab' and 'konfidens' in screen ID to cover all admin pages
+    if (strpos($screen->id, 'kab') !== false || strpos($screen->id, 'konfidens') !== false) {
         wp_enqueue_style('kab-admin-css', KAB_PLUGIN_URL . 'admin/assets/admin.css', array(), KAB_VERSION);
         wp_enqueue_script('kab-admin-js', KAB_PLUGIN_URL . 'admin/assets/admin.js', array('jquery', 'wp-color-picker'), KAB_VERSION, true);
         wp_enqueue_style('wp-color-picker');

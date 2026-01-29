@@ -25,9 +25,13 @@
 }
 
 /* Progress Bar */
+@media (min-width: 768px) {
+    .kab-form-progress {
+        max-width: 250px;
+    }
+}
 .kab-form-progress {
-    max-width: 250px;
-    margin: 0px auto 10px;
+    margin: 0px auto 24px;
 }
 
 .kab-progress-text {
@@ -59,6 +63,9 @@
     flex-direction: column;
     justify-content: space-between;
     min-height: 520px;
+}
+.kab-step-header{
+    margin-bottom: 24px;
 }
 
 .kab-form-step .kab-step-header h3 {
@@ -106,9 +113,12 @@
     position: relative;
     z-index: 2;
 }
-
-.kab-category-header:hover {
-    background-color: #d9d6e5;
+.kab-locations-list .kab-category-header{
+    justify-content: center !important;
+}
+.kab-locations-list .kab-category-header .kab-category-toggle{
+    right: 24px;
+    position: absolute;
 }
 
 .kab-category-name {
@@ -137,10 +147,19 @@
     right: 0;
     display: grid;
     grid-template-columns: repeat(1, 1fr);
-    gap: 5px;
-    margin-top: 5px;
     z-index: 10;
-    background-color: #ffffff;
+    background-color: #e8e5f4;
+    border: 0.5px solid #C7BFEA;
+    border-bottom-width: 0;
+    border-radius: 0 0 10px 10px;
+}
+
+.kab-category-services .kab-category-item {
+    border-bottom: 0.5px solid #C7BFEA;
+    border-radius: 0;
+}
+.kab-category-services .kab-category-item:last-child {
+    border-radius: 0 0 10px 10px !important;
 }
 
 /* Step Section (for combined steps) */
@@ -226,11 +245,11 @@
 }
 
 .kab-category-item:hover {
-    background-color: #d9d6e5;
+    background-color: #C7BFEA;
 }
 
 .kab-category-item.selected {
-    background-color: #d9d6e5;
+    background-color: #C7BFEA;
 }
 
 /* Specialists List */
@@ -253,7 +272,6 @@
 
 .kab-specialist-image {
     width: 180px;
-    height: 180px;
     overflow: hidden;
     margin-right: 20px;
     flex-shrink: 0;
@@ -369,6 +387,7 @@
 }
 
 .kab-therapist-name {
+    font-family: "Playfair Display", Sans-serif;
     font-weight: 600;
     font-size: 18px;
     color: #333;
@@ -407,10 +426,14 @@
 }
 
 .kab-change-therapist-link {
+    color: #452daf;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 145%;
+    letter-spacing: -0.3px;
     display: block;
-    color: #673AB7;
     text-decoration: none;
-    font-size: 14px;
 }
 
 .kab-change-therapist-link:hover {
@@ -606,8 +629,7 @@
 }
 
 .kab-day:hover:not(.empty):not(.disabled) {
-    background-color: #452daf;
-    color: var(--kab-white);
+    background-color: #E8E5F4;
 }
 
 .kab-day.selected {
@@ -756,12 +778,16 @@
 
 /* Submit Button */
 .kab-submit-btn {
-    background-color: #673AB7 !important;
+    font-family: "Manrope", Sans-serif;
+    font-size: 18px !important;
+    font-weight: 400 !important;
+    line-height: 145%;
+    letter-spacing: -0.3px;
+    background-color: #452DAF !important;
     color: white !important;
     border: none !important;
     border-radius: 4px !important;
     padding: 12px 25px !important;
-    font-weight: 600;
     width: 100% !important;
     margin-top: 10px;
     cursor: pointer;
@@ -792,9 +818,22 @@
     justify-content: space-between;
 }
 
-/* For step 3 with prev and random button */
+/* For step 3 with prev and random therapist label + button */
 .kab-form-step[data-step="3"] .kab-form-navigation {
     justify-content: space-between;
+}
+
+.kab-form-navigation-step3 .kab-random-specialist-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.kab-form-navigation-step3 .kab-random-specialist-label {
+    font-size: 1rem;
+    color: #333;
+    font-weight: 500;
 }
 
 .kab-prev-btn,
@@ -1003,7 +1042,7 @@
     max-height: 680px;
     overflow-y: auto;
     background-color: var(--kab-white);
-    padding: 40px;
+    padding: 68px 32px 32px;
     border-radius: 10px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     color: #000;
@@ -1014,17 +1053,17 @@
 
 .kab-popup-close, .kab-popup-close:hover {
     position: absolute;
-    top: 10px;
-    right: 15px;
-    font-size: 24px;
+    top: 32px;
+    right: 32px;
+    font-size: 32px;
     font-weight: bold;
     cursor: pointer;
     border: none;
     background: transparent;
     padding: 0;
-    width: 30px;
-    height: 30px;
-    line-height: 30px;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
     text-align: center;
     color: #000;
 }
@@ -1056,6 +1095,10 @@
 
 /* Responsive Styles */
 @media (max-width: 768px) {
+
+    .kab-popup-content {
+        padding: 44px 20px 20px;
+    }
     
     .kab-services-list,
     .kab-categories-list {

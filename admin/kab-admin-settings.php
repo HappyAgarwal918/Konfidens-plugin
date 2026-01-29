@@ -284,7 +284,7 @@ function kab_display_settings_page() {
     $recaptcha_secret_key = get_option('kab_recaptcha_secret_key', '');
     
     ?>
-    <div class="wrap kab-admin">
+    <div class="wrap kab-admin kab-settings-page">
         <h1><?php _e('Konfidens Settings', 'konfidens-appointment-booking'); ?></h1>
         
         <?php settings_errors('kab_settings'); ?>
@@ -333,6 +333,41 @@ function kab_display_settings_page() {
             <div class="kab-settings-section">
                 <h2><?php _e('Email Settings', 'konfidens-appointment-booking'); ?></h2>
                 <p><?php _e('Configure email notifications for new bookings.', 'konfidens-appointment-booking'); ?></p>
+                
+                <?php
+                // Check if common SMTP plugins are active
+                $smtp_plugins = array(
+                    'wp-mail-smtp/wp_mail_smtp.php' => 'WP Mail SMTP',
+                    'easy-wp-smtp/easy-wp-smtp.php' => 'Easy WP SMTP',
+                    'post-smtp/postman-smtp.php' => 'Post SMTP',
+                    'wp-smtp/wp-smtp.php' => 'WP SMTP'
+                );
+                $active_smtp = false;
+                foreach ($smtp_plugins as $plugin => $name) {
+                    if (is_plugin_active($plugin)) {
+                        $active_smtp = $name;
+                        break;
+                    }
+                }
+                
+                if (!$active_smtp): ?>
+                    <div class="notice notice-info inline" style="margin: 15px 0;">
+                        <p>
+                            <strong><?php _e('Email Configuration Notice:', 'konfidens-appointment-booking'); ?></strong>
+                            <?php _e('WordPress may not be able to send emails if your server\'s mail function is not configured. ', 'konfidens-appointment-booking'); ?>
+                            <?php _e('For reliable email delivery, we recommend installing an SMTP plugin like ', 'konfidens-appointment-booking'); ?>
+                            <a href="<?php echo admin_url('plugin-install.php?s=wp+mail+smtp&tab=search&type=term'); ?>" target="_blank">WP Mail SMTP</a>.
+                            <?php _e('Use the test email button below to verify your email configuration.', 'konfidens-appointment-booking'); ?>
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div class="notice notice-success inline" style="margin: 15px 0;">
+                        <p>
+                            <strong><?php _e('SMTP Plugin Detected:', 'konfidens-appointment-booking'); ?></strong>
+                            <?php printf(__('%s is active. Make sure it\'s properly configured.', 'konfidens-appointment-booking'), $active_smtp); ?>
+                        </p>
+                    </div>
+                <?php endif; ?>
                 
                 <table class="form-table">
                     <tr>

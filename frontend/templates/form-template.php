@@ -71,9 +71,12 @@ $form_classes[] = 'kab-context-' . $context;
                     <div class="kab-loading"><?php _e('Loading therapists...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>
-            <div class="kab-form-navigation">
-                <button class="kab-prev-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
-                <button class="kab-random-specialist-btn"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowright.png'; ?>" alt="<?php _e('Next', 'konfidens-appointment-booking'); ?>"></button>
+            <div class="kab-form-navigation kab-form-navigation-step3">
+                <button type="button" class="kab-prev-btn" aria-label="<?php esc_attr_e('Back', 'konfidens-appointment-booking'); ?>"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowleft.png'; ?>" alt="<?php _e('Back', 'konfidens-appointment-booking'); ?>"></button>
+                <div class="kab-random-specialist-wrap">
+                    <span class="kab-random-specialist-label"><?php _e('Tildel en tilfeldig terapeut', 'konfidens-appointment-booking'); ?></span>
+                    <button type="button" class="kab-random-specialist-btn" aria-label="<?php esc_attr_e('Assign a random therapist', 'konfidens-appointment-booking'); ?>"><img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'arrowright.png'; ?>" alt=""></button>
+                </div>
             </div>
         </div>
         

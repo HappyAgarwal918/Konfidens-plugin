@@ -390,9 +390,10 @@
                                 $categoriesList.find('.kab-category-services').not($categories).slideUp(200);
                                 $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
                                 
-                                // Toggle current parent category
+                                // Toggle current parent category (check visibility before toggle so icon updates correctly)
+                                const isCurrentlyVisible = $categories.is(':visible');
                                 $categories.slideToggle(200);
-                                $toggle.text($categories.is(':visible') ? '−' : '+');
+                                $toggle.text(isCurrentlyVisible ? '+' : '−');
                             });
                         }
                     } else {
@@ -651,9 +652,10 @@
                                         $locationsList.find('.kab-category-services').not($locations).slideUp(200);
                                         $locationsList.find('.kab-category-toggle').not($toggle).text('+');
                                         
-                                        // Toggle current location category
+                                        // Toggle current location category (check visibility before toggle so icon updates correctly)
+                                        const isCurrentlyVisible = $locations.is(':visible');
                                         $locations.slideToggle(200);
-                                        $toggle.text($locations.is(':visible') ? '−' : '+');
+                                        $toggle.text(isCurrentlyVisible ? '+' : '−');
                                     });
                                 }
                     } else {
@@ -743,8 +745,9 @@
                     const $toggle = $header.find('.kab-category-toggle');
                     $container.find('.kab-category-services').not($locations).slideUp(200);
                     $container.find('.kab-category-toggle').not($toggle).text('+');
+                    const isCurrentlyVisible = $locations.is(':visible');
                     $locations.slideToggle(200);
-                    $toggle.text($locations.is(':visible') ? '−' : '+');
+                    $toggle.text(isCurrentlyVisible ? '+' : '−');
                 });
             }
         }

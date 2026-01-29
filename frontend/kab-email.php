@@ -10,10 +10,16 @@ function kab_send_booking_notification($booking_data) {
     $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
     $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
     $content = kab_get_email_template($booking_data, $date, $time);
+    
+    // Use SMTP-compatible From address
+    $from_email = function_exists('kab_get_from_email') ? kab_get_from_email() : get_option('admin_email');
+    $from_name = function_exists('kab_get_from_name') ? kab_get_from_name() : get_bloginfo('name');
+    
     $headers = array(
         'Content-Type: text/html; charset=UTF-8',
-        'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
+        'From: ' . $from_name . ' <' . $from_email . '>'
     );
+    
     $admin_email_sent = wp_mail($recipient, $subject, $content, $headers);
     kab_send_user_confirmation_email($booking_data);
     return $admin_email_sent;
@@ -30,10 +36,16 @@ function kab_send_user_confirmation_email($booking_data) {
     $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
     $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
     $content = kab_get_user_confirmation_email_template($booking_data, $date, $time);
+    
+    // Use SMTP-compatible From address
+    $from_email = function_exists('kab_get_from_email') ? kab_get_from_email() : get_option('admin_email');
+    $from_name = function_exists('kab_get_from_name') ? kab_get_from_name() : get_bloginfo('name');
+    
     $headers = array(
         'Content-Type: text/html; charset=UTF-8',
-        'From: ' . get_bloginfo('name') . ' <' . get_option('admin_email') . '>'
+        'From: ' . $from_name . ' <' . $from_email . '>'
     );
+    
     return wp_mail($user_email, $subject, $content, $headers);
 }
 
