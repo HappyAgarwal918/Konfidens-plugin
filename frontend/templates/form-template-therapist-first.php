@@ -44,8 +44,8 @@ $form_classes[] = 'kab-context-' . $context;
         <div class="kab-form-step" data-step="1">
             <div>
                 <div class="kab-step-header">
-                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg kategori">
-                    <h3><?php _e('Velg kategori', 'konfidens-appointment-booking'); ?></h3>
+                    <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'clover.png'; ?>" alt="Velg tjeneste">
+                    <h3><?php _e('Velg tjeneste', 'konfidens-appointment-booking'); ?></h3>
                     <p><?php _e('Hva kan vi hjelpe deg med?', 'konfidens-appointment-booking'); ?></p>
                 </div>
                 
@@ -169,7 +169,7 @@ $form_classes[] = 'kab-context-' . $context;
                         
                         <div class="kab-form-group kab-checkbox-group">
                             <input type="checkbox" id="kab-terms-tf" name="terms" required>
-                            <label for="kab-terms-tf"><?php _e('Klikk & samtykk til våre', 'konfidens-appointment-booking'); ?> <a href="#" class="kab-terms-link"><?php _e('handelsbetingelser', 'konfidens-appointment-booking'); ?></a> <?php _e('for å fullføre bestilling.', 'konfidens-appointment-booking'); ?></label>
+                            <label for="kab-terms-tf" class="kab-terms-label"><?php _e('Klikk & samtykk til våre', 'konfidens-appointment-booking'); ?> <a href="#" class="kab-terms-link"><?php _e('handelsbetingelser', 'konfidens-appointment-booking'); ?></a> <?php _e('for å fullføre bestilling.', 'konfidens-appointment-booking'); ?></label>
                         </div>
                         
                         <?php if (get_option('kab_enable_recaptcha', false) && !empty(get_option('kab_recaptcha_site_key', ''))): ?>
