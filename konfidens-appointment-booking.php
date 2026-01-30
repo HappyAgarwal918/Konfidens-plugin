@@ -138,21 +138,21 @@ function kab_admin_enqueue_scripts() {
 }
 add_action('admin_enqueue_scripts', 'kab_admin_enqueue_scripts');
 
-// Enqueue frontend scripts and styles for booking forms
-function kab_enqueue_scripts() {
-    wp_enqueue_style('kab-css', KAB_PLUGIN_URL . 'frontend/assets/public.css', array(), KAB_VERSION);
-    wp_enqueue_script('kab-js', KAB_PLUGIN_URL . 'frontend/assets/public.js', array('jquery'), KAB_VERSION, true);
-    wp_enqueue_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
-    
-    // Load reCAPTCHA if enabled in settings
-    if (get_option('kab_enable_recaptcha', false)) {
-        $recaptcha_site_key = get_option('kab_recaptcha_site_key', '');
-        
-        if (!empty($recaptcha_site_key)) {
-            wp_enqueue_script('kab-recaptcha', 'https://www.google.com/recaptcha/api.js?render=' . $recaptcha_site_key, array(), null, true);
-        }
-    }
-    
+// Register and conditionally enqueue frontend scripts (only when shortcode is used)
+function kab_register_scripts() {
+    wp_register_style('kab-css', KAB_PLUGIN_URL . 'frontend/assets/public.css', array(), KAB_VERSION);
+    wp_register_script('kab-js', KAB_PLUGIN_URL . 'frontend/assets/public.js', array('jquery'), KAB_VERSION, true);
+    wp_register_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
+}
+add_action('wp_enqueue_scripts', 'kab_register_scripts', 5);
+
+/**
+ * Enqueue booking assets (called from shortcode so scripts load only on pages with booking form)
+ */
+function kab_enqueue_booking_assets() {
+    wp_enqueue_style('kab-css');
+    wp_enqueue_script('kab-js');
+    wp_enqueue_script('kab-js-therapist-first');
     wp_localize_script('kab-js', 'kab_vars', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('kab-public-nonce'),
@@ -168,24 +168,37 @@ function kab_enqueue_scripts() {
         'select_time' => __('Please select a time slot.', 'konfidens-appointment-booking'),
         'recaptcha_site_key' => get_option('kab_recaptcha_site_key', '')
     ));
-    
-    wp_localize_script('kab-js-therapist-first', 'kab_vars', array(
-        'ajax_url' => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('kab-public-nonce'),
-        'plugin_url' => plugin_dir_url(__FILE__),
-        'loading' => __('Loading...', 'konfidens-appointment-booking'),
-        'error' => __('Error occurred. Please try again.', 'konfidens-appointment-booking'),
-        'no_services' => __('No services available.', 'konfidens-appointment-booking'),
-        'no_specialists' => __('No specialists available for this service.', 'konfidens-appointment-booking'),
-        'no_timeslots' => __('No available time slots for the selected date.', 'konfidens-appointment-booking'),
-        'select_service' => __('Please select a service.', 'konfidens-appointment-booking'),
-        'select_specialist' => __('Please select a specialist.', 'konfidens-appointment-booking'),
-        'select_date' => __('Please select a date.', 'konfidens-appointment-booking'),
-        'select_time' => __('Please select a time slot.', 'konfidens-appointment-booking'),
-        'recaptcha_site_key' => get_option('kab_recaptcha_site_key', '')
-    ));
+
+    if (get_option('kab_enable_recaptcha', false)) {
+        $recaptcha_site_key = get_option('kab_recaptcha_site_key', '');
+        if (!empty($recaptcha_site_key) && !wp_script_is('kab-recaptcha', 'enqueued')) {
+            wp_enqueue_script('kab-recaptcha', 'https://www.google.com/recaptcha/api.js?render=' . $recaptcha_site_key, array(), null, true);
+        }
+    }
 }
-add_action('wp_enqueue_scripts', 'kab_enqueue_scripts');
+
+/**
+ * Warm booking cache when shortcode is shown (so first form open is fast)
+ * Only runs if cache is empty; uses transients so later requests are instant.
+ */
+function kab_warm_booking_cache() {
+    if (get_transient('kab_services_with_priority') === false) {
+        kab_get_services_with_priority();
+    }
+    if (get_transient('kab_all_therapists') === false) {
+        kab_get_all_therapists();
+    }
+}
+
+/**
+ * Clear API caches (call after saving settings or when data may have changed)
+ */
+function kab_clear_api_cache() {
+    delete_transient('kab_services_with_priority');
+    delete_transient('kab_all_therapists');
+    delete_transient('kab_all_services_with_categories');
+    delete_transient('kab_therapist_service_map');
+}
 
 // Make API requests to Konfidens API with authentication
 function kab_api_request($endpoint, $args = array(), $method = 'GET') {
@@ -277,6 +290,9 @@ add_action('init', 'kab_register_shortcodes');
 // Shortcode handler: [su_button] - Creates booking form popup button
 // Parameters: id (therapist ID), set (service set ID), background, class
 function kab_button_shortcode($atts, $content = null) {
+    kab_enqueue_booking_assets();
+    // Warm API cache on first load so the form responds quickly when user opens it
+    kab_warm_booking_cache();
     $atts = shortcode_atts(
         array(
             'background' => '', // Button background color

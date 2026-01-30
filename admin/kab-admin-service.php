@@ -355,9 +355,15 @@ function kab_get_service_by_id($service_id) {
 }
 
 /**
- * Get all services
+ * Get all services (cached 5 minutes to reduce API calls)
  */
 function kab_get_services_with_priority() {
+    $cache_key = 'kab_services_with_priority';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
     $services = array();
     
@@ -438,7 +444,8 @@ function kab_get_services_with_priority() {
             $services[] = $service;
         }
     }
-    
+
+    set_transient($cache_key, $services, 300); // 5 minutes
     return $services;
 }
 

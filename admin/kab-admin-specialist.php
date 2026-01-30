@@ -129,9 +129,15 @@ function kab_display_therapists_page() {
 }
 
 /**
- * Get all therapists
+ * Get all therapists (cached 5 minutes to reduce API calls)
  */
 function kab_get_all_therapists() {
+    $cache_key = 'kab_all_therapists';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+
     // Try to get all specialists directly first
     $specialists_response = kab_api_request('specialists', array('clinic_id' => get_option('kab_clinic_id', '')));
     $therapists = array();
@@ -141,7 +147,7 @@ function kab_get_all_therapists() {
         foreach ($specialists_response['data'] as $specialist) {
             $therapists[$specialist['id']] = $specialist;
         }
-        
+        set_transient($cache_key, $therapists, 300); // 5 minutes
         return $therapists;
     }
     
@@ -173,7 +179,8 @@ function kab_get_all_therapists() {
             }
         }
     }
-    
+
+    set_transient($cache_key, $therapists, 300); // 5 minutes
     return $therapists;
 }
 
@@ -191,9 +198,15 @@ function kab_get_therapist_by_id($therapist_id) {
 }
 
 /**
- * Get therapists for a service
+ * Get therapists for a service (cached 5 minutes per service to reduce API calls)
  */
 function kab_get_therapists_for_service($service_id) {
+    $cache_key = 'kab_therapists_service_' . md5($service_id);
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+
     $specialists_response = kab_api_request('specialists', array(
         'clinic_id' => get_option('kab_clinic_id', ''),
         'service_id' => $service_id
@@ -203,7 +216,8 @@ function kab_get_therapists_for_service($service_id) {
     if ($specialists_response['success'] && !empty($specialists_response['data'])) {
         $therapists = $specialists_response['data'];
     }
-    
+
+    set_transient($cache_key, $therapists, 300); // 5 minutes
     return $therapists;
 }
 

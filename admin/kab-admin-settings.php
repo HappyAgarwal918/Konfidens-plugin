@@ -249,6 +249,7 @@ function kab_display_settings_page() {
         
         // Set admin notice
         if ($result !== false) {
+            kab_clear_api_cache();
             add_settings_error(
                 'kab_settings',
                 'kab_settings_saved',

@@ -262,23 +262,19 @@ add_action('wp_ajax_kab_get_locations_by_category', 'kab_get_locations_by_catego
 add_action('wp_ajax_nopriv_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
 
 /**
- * Fetch service directly from API
+ 
+* Fetch service directly from API (for price in last step - always fresh
  */
 function kab_fetch_service_from_api($service_id) {
-    // Fetch services directly from API
     $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
-    
     if (!$services_response['success'] || empty($services_response['data'])) {
         return null;
     }
-    
-    // Find the specific service
     foreach ($services_response['data'] as $s) {
-        if ((string)$s['id'] === (string)$service_id) {
+        if ((string) $s['id'] === (string) $service_id) {
             return $s;
         }
     }
-    
     return null;
 }
 
@@ -298,21 +294,14 @@ function kab_get_service_price_ajax() {
     
     $service_id = sanitize_text_field($_POST['service_id']);
     
-    // Log: Starting price fetch
-    error_log('KAB: Fetching price for service ID: ' . $service_id);
-    
-    // Fetch service from API
+    // Fetch service directly from API for accurate price in last step
     $service = kab_fetch_service_from_api($service_id);
-    
     if (!$service) {
-        error_log('KAB: Service not found in API response for ID: ' . $service_id);
         wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
     }
     
-    // Extract price using the same logic as admin
     $extract_price = function($value) {
         $raw_price = '';
-        
         if (is_array($value)) {
             foreach ($value as $item) {
                 if (is_numeric($item)) {
@@ -334,8 +323,6 @@ function kab_get_service_price_ajax() {
         } else {
             $raw_price = (string) $value;
         }
-        
-        // Convert from cents to main currency if needed
         if (!empty($raw_price) && is_numeric($raw_price)) {
             $numeric_price = floatval($raw_price);
             if ($numeric_price >= 1000 && $numeric_price == floor($numeric_price)) {
@@ -344,56 +331,34 @@ function kab_get_service_price_ajax() {
                 return (string) $numeric_price;
             }
         }
-        
         return $raw_price;
     };
     
-    // Get price from API - check common field names (same as admin)
     $price_fields = array('price', 'Price', 'amount', 'Amount');
     $price = '';
-    
-    // Log: Service object structure
-    error_log('KAB: Service object keys: ' . implode(', ', array_keys($service)));
-    
     foreach ($price_fields as $field) {
         if (isset($service[$field])) {
-            error_log('KAB: Found price field "' . $field . '" with value: ' . print_r($service[$field], true));
             $price = $extract_price($service[$field]);
             if (!empty($price)) {
-                error_log('KAB: Extracted price: ' . $price);
                 break;
             }
         }
     }
-    
-    // If not found, default to 0
     if (empty($price)) {
-        error_log('KAB: No price found in standard fields. Checking all service fields...');
-        // Check all fields for price-related names
         foreach ($service as $key => $value) {
             if (stripos($key, 'price') !== false || stripos($key, 'amount') !== false || stripos($key, 'cost') !== false) {
-                error_log('KAB: Found price-related field "' . $key . '" with value: ' . print_r($value, true));
                 $extracted = $extract_price($value);
                 if (!empty($extracted)) {
                     $price = $extracted;
-                    error_log('KAB: Extracted price from field "' . $key . '": ' . $price);
                     break;
                 }
             }
         }
     }
-    
     if (empty($price)) {
-        error_log('KAB: Price extraction failed - defaulting to 0');
         $price = '0';
     }
-    
-    // Ensure price is always a string
-    $price = (string) $price;
-    
-    error_log('KAB: Final price returned: ' . $price);
-    
-    wp_send_json_success(array('price' => $price));
+    wp_send_json_success(array('price' => (string) $price));
 }
 add_action('wp_ajax_kab_get_service_price', 'kab_get_service_price_ajax');
 add_action('wp_ajax_nopriv_kab_get_service_price', 'kab_get_service_price_ajax');
