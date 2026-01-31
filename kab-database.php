@@ -107,6 +107,7 @@ function kab_create_tables() {
         id int(11) NOT NULL AUTO_INCREMENT,
         specialist_id varchar(50) NOT NULL,
         tags text DEFAULT '',
+        profession varchar(255) DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id)
@@ -116,6 +117,12 @@ function kab_create_tables() {
     $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'tags'");
     if (empty($column_exists)) {
         $wpdb->query("ALTER TABLE $location_specialist_table ADD COLUMN tags text DEFAULT '' AFTER specialist_id");
+    }
+    
+    // Add profession column if it doesn't exist (single value per therapist)
+    $profession_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'profession'");
+    if (empty($profession_exists)) {
+        $wpdb->query("ALTER TABLE $location_specialist_table ADD COLUMN profession varchar(255) DEFAULT '' AFTER tags");
     }
     
     // Create booking form data table
@@ -640,6 +647,20 @@ function kab_add_update_service_location($service_id, $location_ids, $category_i
     }
 }
 
+/**
+ * Get profession stored for a specialist (single value)
+ */
+function kab_get_specialist_profession($specialist_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'profession'");
+    if (empty($column_exists)) {
+        return '';
+    }
+    $row = $wpdb->get_row($wpdb->prepare("SELECT profession FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    return ($row && $row->profession !== null && $row->profession !== '') ? $row->profession : '';
+}
+
 // Get tags stored for a specialist
 function kab_get_specialist_tags($specialist_id) {
     global $wpdb;
@@ -674,6 +695,7 @@ function kab_update_specialist_tags($specialist_id, $tags) {
     }
     
     $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    $profession_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'profession'");
     
     if ($existing) {
         $result = $wpdb->update(
@@ -683,33 +705,61 @@ function kab_update_specialist_tags($specialist_id, $tags) {
             array('%s'),
             array('%s')
         );
-        
-        // wpdb->update returns number of rows affected (0 or more), false on error
         return $result !== false;
     } else {
-        // Check if location_ids column exists (it's deprecated but may exist in some installations)
         $location_ids_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'location_ids'");
-        
-        // If no record exists, create one
-        // Only include location_ids if the column exists (for backward compatibility)
         $insert_data = array(
             'specialist_id' => sanitize_text_field($specialist_id),
             'tags' => $tags_string
         );
         $insert_format = array('%s', '%s');
-        
+        if (!empty($profession_column_exists)) {
+            $insert_data['profession'] = '';
+            $insert_format[] = '%s';
+        }
         if (!empty($location_ids_column_exists)) {
             $insert_data['location_ids'] = '';
             $insert_format[] = '%s';
         }
-        
-        $result = $wpdb->insert(
-            $table_name,
-            $insert_data,
-            $insert_format
-        );
-        
+        $result = $wpdb->insert($table_name, $insert_data, $insert_format);
         return $result !== false;
+    }
+}
+
+/**
+ * Update specialist profession (single value)
+ */
+function kab_update_specialist_profession($specialist_id, $profession) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    $profession = sanitize_text_field($profession);
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'profession'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN profession varchar(255) DEFAULT '' AFTER tags");
+    }
+    $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    if ($existing) {
+        return $wpdb->update(
+            $table_name,
+            array('profession' => $profession),
+            array('specialist_id' => $specialist_id),
+            array('%s'),
+            array('%s')
+        ) !== false;
+    } else {
+        $location_ids_column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'location_ids'");
+        $insert_data = array(
+            'specialist_id' => sanitize_text_field($specialist_id),
+            'tags' => '',
+            'profession' => $profession
+        );
+        $insert_format = array('%s', '%s', '%s');
+        if (!empty($location_ids_column_exists)) {
+            $insert_data['location_ids'] = '';
+            $insert_format[] = '%s';
+        }
+        $result = $wpdb->insert($table_name, $insert_data, $insert_format);
+        return $result ? $wpdb->insert_id : false;
     }
 }
 

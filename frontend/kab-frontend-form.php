@@ -544,10 +544,14 @@ function kab_get_specialists_ajax() {
                 $specialists[$key]['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $specialist['image'];
             }
             
-            // Add stored tags from database
+            // Add stored tags and profession from database
             $stored_tags = kab_get_specialist_tags($specialist['id']);
             if (!empty($stored_tags)) {
                 $specialists[$key]['stored_tags'] = $stored_tags;
+            }
+            $stored_profession = kab_get_specialist_profession($specialist['id']);
+            if ($stored_profession !== '') {
+                $specialists[$key]['profession'] = $stored_profession;
             }
         }
     }
@@ -655,10 +659,14 @@ function kab_get_all_therapists_ajax() {
                 $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['image'];
             }
             
-            // Add stored tags from database
+            // Add stored tags and profession from database
             $stored_tags = kab_get_specialist_tags($therapist['id']);
             if (!empty($stored_tags)) {
                 $therapist['stored_tags'] = $stored_tags;
+            }
+            $stored_profession = kab_get_specialist_profession($therapist['id']);
+            if ($stored_profession !== '') {
+                $therapist['profession'] = $stored_profession;
             }
             
             // Location assignment removed - therapists no longer have location restrictions

@@ -601,7 +601,7 @@
                                         </div>
                                         <div class="kab-specialist-info">
                                             <h4 class="kab-specialist-name">${specialist.name}</h4>
-                                            ${specialist.title ? `<div class="kab-specialist-title">${specialist.title}</div>` : ''}
+                                            ${specialist.profession ? `<div class="kab-specialist-profession">${specialist.profession}</div>` : ''}
                                             ${descriptionHtml}
                                         </div>
                                     </div>

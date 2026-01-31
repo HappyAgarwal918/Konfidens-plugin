@@ -245,8 +245,6 @@
             
             const imageUrl = therapist.image_url || therapist.profile_image || therapist.image || '';
             const therapistName = therapist.name || '';
-            const therapistTitle = therapist.title || '';
-            
             // Set image
             const $img = $card.find('.kab-therapist-img');
             if (imageUrl) {
@@ -256,9 +254,9 @@
                 $img.attr('src', 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2RkZCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+').attr('alt', therapistName);
             }
             
-            // Set name and title
+            // Set name and profession
             $card.find('.kab-therapist-name').text(therapistName);
-            $card.find('.kab-therapist-title').text(therapistTitle);
+            $card.find('.kab-therapist-profession').text(therapist.profession || '').toggle(!!(therapist.profession));
         }
         
         /**
@@ -451,7 +449,6 @@
                         $.each(self.allTherapists, function(index, therapist) {
                             const imageUrl = therapist.image_url || therapist.profile_image || therapist.image || 'https://via.placeholder.com/100';
                             const therapistName = therapist.name || '';
-                            const therapistTitle = therapist.title || '';
                             
                             html += `
                                 <div class="kab-therapist-select-card" data-therapist-id="${therapist.id}">
@@ -461,7 +458,7 @@
                                         </div>
                                         <div class="kab-therapist-info">
                                             <div class="kab-therapist-name">${therapistName}</div>
-                                            ${therapistTitle ? `<div class="kab-therapist-title">${therapistTitle}</div>` : ''}
+                                            ${therapist.profession ? `<div class="kab-therapist-profession">${therapist.profession}</div>` : ''}
                                         </div>
                                     </div>
                                 </div>

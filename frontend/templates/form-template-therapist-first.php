@@ -62,7 +62,7 @@ $form_classes[] = 'kab-context-' . $context;
                     </div>
                     <div class="kab-therapist-info">
                         <div class="kab-therapist-name"></div>
-                        <div class="kab-therapist-title"></div>
+                        <div class="kab-therapist-profession"></div>
                     </div>
                 </div>
                 <a href="#" class="kab-change-therapist-link"><?php _e('Velg en annen terapeut', 'konfidens-appointment-booking'); ?></a>

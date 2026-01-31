@@ -299,9 +299,13 @@
     color: #1D1C1F;
 }
 
-.kab-specialist-title {
-    font-size: 16px;
-    color: #666;
+.kab-specialist-profession {
+    font-family: "Manrope", Sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 100%;
+    letter-spacing: -1%;
+    color: #6B6970;
     margin-bottom: 15px;
 }
 
@@ -398,11 +402,14 @@
     letter-spacing: -1.2px;
 }
 
-.kab-therapist-title {
-    font-size: 14px;
-    color: #666;
-    line-height: 1.2;
-    margin-bottom: 8px;
+.kab-therapist-profession {
+    font-family: "Manrope", Sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 100%;
+    letter-spacing: -1%;
+    color: #6B6970;
+    margin-bottom: 15px;
 }
 
 .kab-therapist-description {

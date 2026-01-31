@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Display therapists page: Show all therapists and manage tags
+// Display therapists page: Show all therapists and manage tags + profession
 function kab_display_therapists_page() {
     $therapists = kab_get_all_therapists();
     
@@ -36,19 +36,32 @@ function kab_display_therapists_page() {
                         <tr>
                             <th><?php _e('ID', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Name', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Profession', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Tags', 'konfidens-appointment-booking'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($therapists as $therapist): ?>
                             <?php 
-                            // Get therapist tags
                             $therapist_tags = kab_get_specialist_tags($therapist['id']);
                             $tags_string = !empty($therapist_tags) ? implode(', ', $therapist_tags) : '';
+                            $therapist_profession = kab_get_specialist_profession($therapist['id']);
                             ?>
                             <tr>
                                 <td><?php echo esc_html($therapist['id']); ?></td>
                                 <td><?php echo esc_html($therapist['name']); ?></td>
+                                <td>
+                                    <input type="text" 
+                                        class="therapist-profession-input regular-text" 
+                                        data-therapist-id="<?php echo esc_attr($therapist['id']); ?>"
+                                        value="<?php echo esc_attr($therapist_profession); ?>"
+                                        placeholder="<?php _e('e.g. Psychologist', 'konfidens-appointment-booking'); ?>"
+                                        style="max-width: 200px;"
+                                    />
+                                    <div class="profession-save-status" id="profession-save-status-<?php echo esc_attr($therapist['id']); ?>" style="display: none; margin-top: 5px; color: green; font-style: italic; font-size: 12px;">
+                                        <?php _e('Profession saved!', 'konfidens-appointment-booking'); ?>
+                                    </div>
+                                </td>
                                 <td>
                                     <textarea 
                                         class="therapist-tags-textarea" 
@@ -74,54 +87,67 @@ function kab_display_therapists_page() {
 
     <script>
     jQuery(document).ready(function($) {
-        // Handle tags textarea - save on blur (when user leaves the field)
         var tagsSaveTimeout = {};
         $('.therapist-tags-textarea').on('input', function() {
             var therapistId = $(this).data('therapist-id');
             var $textarea = $(this);
             var saveStatus = $('#tags-save-status-' + therapistId);
-            
-            // Clear existing timeout
-            if (tagsSaveTimeout[therapistId]) {
-                clearTimeout(tagsSaveTimeout[therapistId]);
-            }
-            
-            // Set new timeout to save after 1 second of no typing
+            if (tagsSaveTimeout[therapistId]) clearTimeout(tagsSaveTimeout[therapistId]);
             tagsSaveTimeout[therapistId] = setTimeout(function() {
-                var tags = $textarea.val();
-                
-                // Show saving indicator
                 saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
-                
                 $.ajax({
                     url: ajaxurl,
                     type: 'POST',
                     data: {
                         action: 'kab_update_specialist_tags',
                         specialist_id: therapistId,
-                        tags: tags,
+                        tags: $textarea.val(),
                         nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
                     },
                     success: function(response) {
                         if (response.success) {
                             saveStatus.text('<?php _e("Tags saved!", "konfidens-appointment-booking"); ?>').css('color', 'green');
-                            setTimeout(function() {
-                                saveStatus.fadeOut(500);
-                            }, 2000);
+                            setTimeout(function() { saveStatus.fadeOut(500); }, 2000);
                         } else {
-                            var errorMsg = response.data && response.data.message ? response.data.message : '<?php _e("Error saving tags", "konfidens-appointment-booking"); ?>';
-                            saveStatus.text(errorMsg).css('color', 'red');
+                            saveStatus.text(response.data && response.data.message ? response.data.message : '<?php _e("Error saving tags", "konfidens-appointment-booking"); ?>').css('color', 'red');
                         }
                     },
-                    error: function(xhr, status, error) {
-                        var errorMsg = '<?php _e("Error saving tags", "konfidens-appointment-booking"); ?>';
-                        if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
-                            errorMsg = xhr.responseJSON.data.message;
-                        }
-                        saveStatus.text(errorMsg).css('color', 'red');
+                    error: function(xhr) {
+                        saveStatus.text(xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ? xhr.responseJSON.data.message : '<?php _e("Error saving tags", "konfidens-appointment-booking"); ?>').css('color', 'red');
                     }
                 });
-            }, 1000); // Wait 1 second after user stops typing
+            }, 1000);
+        });
+        var professionSaveTimeout = {};
+        $('.therapist-profession-input').on('input', function() {
+            var therapistId = $(this).data('therapist-id');
+            var $input = $(this);
+            var saveStatus = $('#profession-save-status-' + therapistId);
+            if (professionSaveTimeout[therapistId]) clearTimeout(professionSaveTimeout[therapistId]);
+            professionSaveTimeout[therapistId] = setTimeout(function() {
+                saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'kab_update_specialist_profession',
+                        specialist_id: therapistId,
+                        profession: $input.val(),
+                        nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            saveStatus.text('<?php _e("Profession saved!", "konfidens-appointment-booking"); ?>').css('color', 'green');
+                            setTimeout(function() { saveStatus.fadeOut(500); }, 2000);
+                        } else {
+                            saveStatus.text(response.data && response.data.message ? response.data.message : '<?php _e("Error saving profession", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                        }
+                    },
+                    error: function(xhr) {
+                        saveStatus.text(xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ? xhr.responseJSON.data.message : '<?php _e("Error saving profession", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                    }
+                });
+            }, 1000);
         });
     });
     </script>
@@ -279,3 +305,32 @@ function kab_update_specialist_tags_ajax() {
     }
 }
 add_action('wp_ajax_kab_update_specialist_tags', 'kab_update_specialist_tags_ajax');
+
+/**
+ * AJAX handler for updating specialist profession
+ */
+function kab_update_specialist_profession_ajax() {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    if (!isset($_POST['specialist_id']) || empty($_POST['specialist_id'])) {
+        wp_send_json_error(array('message' => __('Specialist ID is required.', 'konfidens-appointment-booking')));
+    }
+    $specialist_id = sanitize_text_field($_POST['specialist_id']);
+    $profession = isset($_POST['profession']) ? sanitize_text_field($_POST['profession']) : '';
+    $result = kab_update_specialist_profession($specialist_id, $profession);
+    if ($result) {
+        wp_send_json_success(array('message' => __('Profession saved successfully.', 'konfidens-appointment-booking')));
+    } else {
+        global $wpdb;
+        $error_message = __('Failed to update profession.', 'konfidens-appointment-booking');
+        if ($wpdb->last_error) {
+            $error_message .= ' ' . $wpdb->last_error;
+        }
+        wp_send_json_error(array('message' => $error_message));
+    }
+}
+add_action('wp_ajax_kab_update_specialist_profession', 'kab_update_specialist_profession_ajax');
