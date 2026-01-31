@@ -377,21 +377,18 @@
                         // Initialize parent category toggle functionality (only if parent categories exist)
                         if (hasCategorizedCategories) {
                             $categoriesList.find('.kab-category-header').on('click', function(e) {
-                                // Don't trigger category selection when clicking parent header
                                 e.stopPropagation();
-                                
                                 const $header = $(this);
+                                const $group = $header.closest('.kab-category-group');
                                 const $categories = $header.next('.kab-category-services');
                                 const $toggle = $header.find('.kab-category-toggle');
-                                
-                                // Close all other parent categories
+                                const isCurrentlyVisible = $categories.is(':visible');
                                 $categoriesList.find('.kab-category-services').not($categories).slideUp(200);
                                 $categoriesList.find('.kab-category-toggle').not($toggle).text('+');
-                                
-                                // Toggle current parent category (check visibility before toggle so icon updates correctly)
-                                const isCurrentlyVisible = $categories.is(':visible');
+                                $categoriesList.find('.kab-category-group').not($group).removeClass('kab-category-group-open');
                                 $categories.slideToggle(200);
                                 $toggle.text(isCurrentlyVisible ? '+' : '−');
+                                $group.toggleClass('kab-category-group-open', !isCurrentlyVisible);
                             });
                         }
                     } else {
@@ -638,21 +635,18 @@
                                 // Initialize location category toggle functionality (only if location categories exist)
                                 if (hasCategorizedLocations) {
                                     $locationsList.find('.kab-category-header').on('click', function(e) {
-                                        // Don't trigger location selection when clicking category header
                                         e.stopPropagation();
-                                        
                                         const $header = $(this);
+                                        const $group = $header.closest('.kab-category-group');
                                         const $locations = $header.next('.kab-category-services');
                                         const $toggle = $header.find('.kab-category-toggle');
-                                        
-                                        // Close all other location categories
+                                        const isCurrentlyVisible = $locations.is(':visible');
                                         $locationsList.find('.kab-category-services').not($locations).slideUp(200);
                                         $locationsList.find('.kab-category-toggle').not($toggle).text('+');
-                                        
-                                        // Toggle current location category (check visibility before toggle so icon updates correctly)
-                                        const isCurrentlyVisible = $locations.is(':visible');
+                                        $locationsList.find('.kab-category-group').not($group).removeClass('kab-category-group-open');
                                         $locations.slideToggle(200);
                                         $toggle.text(isCurrentlyVisible ? '+' : '−');
+                                        $group.toggleClass('kab-category-group-open', !isCurrentlyVisible);
                                     });
                                 }
                     } else {
@@ -738,13 +732,16 @@
                 $container.find('.kab-category-header').on('click', function(e) {
                     e.stopPropagation();
                     const $header = $(this);
+                    const $group = $header.closest('.kab-category-group');
                     const $locations = $header.next('.kab-category-services');
                     const $toggle = $header.find('.kab-category-toggle');
+                    const isCurrentlyVisible = $locations.is(':visible');
                     $container.find('.kab-category-services').not($locations).slideUp(200);
                     $container.find('.kab-category-toggle').not($toggle).text('+');
-                    const isCurrentlyVisible = $locations.is(':visible');
+                    $container.find('.kab-category-group').not($group).removeClass('kab-category-group-open');
                     $locations.slideToggle(200);
                     $toggle.text(isCurrentlyVisible ? '+' : '−');
+                    $group.toggleClass('kab-category-group-open', !isCurrentlyVisible);
                 });
             }
         }

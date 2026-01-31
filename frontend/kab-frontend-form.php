@@ -38,7 +38,7 @@ function kab_get_categories_by_service_set($set_id) {
     
     $category_ids_str = implode(',', array_map('intval', $category_ids));
     $categories = $wpdb->get_results(
-        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY category_name ASC"
+        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY id ASC"
     );
     
     return $categories;
@@ -918,7 +918,7 @@ function kab_get_categories_for_therapist_ajax() {
     $category_table = $wpdb->prefix . 'kab_service_category';
     $category_ids_str = implode(',', array_map('intval', $category_ids));
     $categories = $wpdb->get_results(
-        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY category_name ASC"
+        "SELECT * FROM $category_table WHERE id IN ($category_ids_str) ORDER BY id ASC"
     );
     
     // Get parent categories for these categories
@@ -934,7 +934,7 @@ function kab_get_categories_for_therapist_ajax() {
         $parent_category_table = $wpdb->prefix . 'kab_service_parent_category';
         $parent_ids_str = implode(',', array_map('intval', $parent_category_ids));
         $parent_categories = $wpdb->get_results(
-            "SELECT * FROM $parent_category_table WHERE id IN ($parent_ids_str) ORDER BY parent_category_name ASC"
+            "SELECT * FROM $parent_category_table WHERE id IN ($parent_ids_str) ORDER BY id ASC"
         );
     }
     

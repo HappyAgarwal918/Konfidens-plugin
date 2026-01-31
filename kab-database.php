@@ -434,7 +434,7 @@ function kab_get_service_categories() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_service_category';
     
-    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY category_name ASC");
+    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY id ASC");
 }
 
 /**
@@ -507,7 +507,7 @@ function kab_get_service_parent_categories() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'kab_service_parent_category';
     
-    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY parent_category_name ASC");
+    return $wpdb->get_results("SELECT * FROM $table_name ORDER BY id ASC");
 }
 
 /**
