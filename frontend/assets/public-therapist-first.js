@@ -1485,8 +1485,12 @@
             // Get therapist_id from button
             const therapistId = $button.data('specialist-id') || $button.data('id') || '';
             
-            // Show popup
             $popup.show();
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    $popup.addClass('kab-popup-open');
+                });
+            });
             
             // Handle therapist-first booking form
             const $form = $popup.find('.kab-booking-form.kab-therapist-first');

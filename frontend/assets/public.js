@@ -571,10 +571,10 @@
                                 tagsHtml += '</div>';
                             }
                             
-                            // Create truncated description with "Les mer" link if description is long
+                            // Create truncated description with "Les mer" link if description is long (120 on mobile, 150 on desktop)
                             let descriptionHtml = '';
                             if (specialist.description) {
-                                const maxLength = 150;
+                                const maxLength = window.innerWidth <= 768 ? 120 : 150;
                                 const shortDesc = specialist.description.length > maxLength 
                                     ? specialist.description.substring(0, maxLength) + '...' 
                                     : specialist.description;
@@ -760,10 +760,8 @@
                 const specialist = self.specialists.find(s => s.id === specialistId);
                 
                 if (specialist && specialist.description) {
-                    // Toggle between short and full description
                     if ($link.hasClass('expanded')) {
-                        // Show short description
-                        const maxLength = 150;
+                        const maxLength = window.innerWidth <= 768 ? 120 : 150;
                         const shortDesc = specialist.description.length > maxLength 
                             ? specialist.description.substring(0, maxLength) + '...' 
                             : specialist.description;
@@ -1691,8 +1689,12 @@
             // Get specialist_id from button (only for therapist-first flow)
             const specialistId = $button.data('specialist-id') || '';
             
-            // Show popup
             $popup.show();
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    $popup.addClass('kab-popup-open');
+                });
+            });
             
             // Skip if this is a therapist-first form (handled by public-therapist-first.js)
             const $therapistForm = $popup.find('.kab-booking-form.kab-therapist-first');
@@ -1716,12 +1718,16 @@
         });
         
         $('.kab-popup-close').click(function() {
-            $(this).closest('.kab-popup').hide();
+            const $p = $(this).closest('.kab-popup');
+            $p.removeClass('kab-popup-open');
+            setTimeout(function() { $p.hide(); }, 350);
         });
         
         $(window).click(function(e) {
             if ($(e.target).hasClass('kab-popup-overlay')) {
-                $('.kab-popup').hide();
+                const $p = $(e.target).closest('.kab-popup');
+                $p.removeClass('kab-popup-open');
+                setTimeout(function() { $p.hide(); }, 350);
             }
         });
     });
