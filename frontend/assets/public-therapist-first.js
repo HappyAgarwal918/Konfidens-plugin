@@ -37,6 +37,7 @@
             this.pendingCategoriesRequest = null;
             this.loadingCategoriesForTherapistId = null;
             this.isLoadingCategories = false;
+            this.isSubmitting = false; // Prevent double booking submission
             
             this.init();
         }
@@ -134,14 +135,6 @@
                 // If validation passes, go to confirmation step and submit
                 self.goToStep(5);
                 self.submitBooking();
-                return false;
-            });
-            
-            // Form submission (fallback for actual form elements)
-            this.$form.on('submit', function(e) {
-                e.preventDefault();
-                self.submitBooking();
-                self.goToStep(5);
                 return false;
             });
             
@@ -1369,13 +1362,13 @@
          * Submit booking
          */
         submitBooking() {
+            if (this.isSubmitting) return;
             const self = this;
             const $confirmationMessage = this.$form.find('.kab-confirmation-message');
             const $loading = $confirmationMessage.find('.kab-loading');
             const $success = $confirmationMessage.find('.kab-success');
             const $error = $confirmationMessage.find('.kab-error');
             
-            // Get form data
             const firstName = this.$form.find('#kab-first-name-tf').val();
             const email = this.$form.find('#kab-email-tf').val();
             const phone = this.$form.find('#kab-phone-tf').val();
@@ -1396,19 +1389,18 @@
                 return;
             }
             
-            // Show loading
             $loading.show();
             $success.hide();
             $error.hide();
-            
-            // Get reCAPTCHA token if enabled
+            this.isSubmitting = true;
             let recaptchaToken = '';
-            
             if (typeof grecaptcha !== 'undefined' && kab_vars.recaptcha_site_key) {
                 grecaptcha.ready(function() {
                     grecaptcha.execute(kab_vars.recaptcha_site_key, {action: 'submit'}).then(function(token) {
                         recaptchaToken = token;
                         self.processBooking(firstName, email, phone, recaptchaToken);
+                    }).catch(function() {
+                        self.isSubmitting = false;
                     });
                 });
             } else {
@@ -1444,19 +1436,18 @@
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
+                    self.isSubmitting = false;
                     $loading.hide();
-                    
                     if (response.success) {
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message || 'Booking created successfully.');
-                        
-                        // No redirect - stay on confirmation step
                     } else {
                         $error.show();
                         $error.find('.kab-error-message').text(response.data.message || kab_vars.error);
                     }
                 },
                 error: function() {
+                    self.isSubmitting = false;
                     $loading.hide();
                     $error.show();
                     $error.find('.kab-error-message').text(kab_vars.error);

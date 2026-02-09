@@ -32,6 +32,7 @@
             this.specialists = []; // Store specialists data for random selection
             this.isInitialLoad = true; // Flag to track if this is the initial load
             this.isLoadingSpecialists = false; // Flag to prevent multiple simultaneous specialist loads
+            this.isSubmitting = false; // Flag to prevent double booking submission
             this.serviceSetId = this.$form.data('service-set') || ''; // Get service set ID from data attribute
             
             // Determine which steps are visible and create step mapping
@@ -227,14 +228,6 @@
                 // If validation passes, go to confirmation step and submit
                 self.goToStep(6);
                 self.submitBooking();
-                return false;
-            });
-            
-            // Form submission (fallback for actual form elements)
-            this.$form.on('submit', function(e) {
-                e.preventDefault();
-                self.submitBooking();
-                self.goToStep(6);
                 return false;
             });
             
@@ -1564,6 +1557,7 @@
          * Submit booking
          */
         submitBooking() {
+            if (this.isSubmitting) return;
             const self = this;
             const $confirmationMessage = this.$form.find('.kab-confirmation-message');
             const $loading = $confirmationMessage.find('.kab-loading');
@@ -1601,11 +1595,14 @@
             // Get reCAPTCHA token if enabled
             let recaptchaToken = '';
             
+            this.isSubmitting = true;
             if (typeof grecaptcha !== 'undefined' && kab_vars.recaptcha_site_key) {
                 grecaptcha.ready(function() {
                     grecaptcha.execute(kab_vars.recaptcha_site_key, {action: 'submit'}).then(function(token) {
                         recaptchaToken = token;
                         self.processBooking(firstName, lastName, email, phone, notes, recaptchaToken);
+                    }).catch(function() {
+                        self.isSubmitting = false;
                     });
                 });
             } else {
@@ -1648,19 +1645,18 @@
                     nonce: kab_vars.nonce
                 },
                 success: function(response) {
+                    self.isSubmitting = false;
                     $loading.hide();
-                    
                     if (response.success) {
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message);
-                        
-                        // No redirect - stay on confirmation step
                     } else {
                         $error.show();
                         $error.find('.kab-error-message').text(response.data.message);
                     }
                 },
                 error: function() {
+                    self.isSubmitting = false;
                     $loading.hide();
                     $error.show();
                     $error.find('.kab-error-message').text(kab_vars.error);

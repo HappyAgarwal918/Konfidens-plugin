@@ -21,33 +21,33 @@ function kab_send_booking_notification($booking_data) {
     );
     
     $admin_email_sent = wp_mail($recipient, $subject, $content, $headers);
-    kab_send_user_confirmation_email($booking_data);
+    // kab_send_user_confirmation_email($booking_data);
     return $admin_email_sent;
 }
 
 // Send booking confirmation email to the user
-function kab_send_user_confirmation_email($booking_data) {
-    if (empty($booking_data['email'])) {
-        return false;
-    }
+// function kab_send_user_confirmation_email($booking_data) {
+//     if (empty($booking_data['email'])) {
+//         return false;
+//     }
     
-    $user_email = sanitize_email($booking_data['email']);
-    $subject = __('Booking Confirmation', 'konfidens-appointment-booking');
-    $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
-    $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
-    $content = kab_get_user_confirmation_email_template($booking_data, $date, $time);
+//     $user_email = sanitize_email($booking_data['email']);
+//     $subject = __('Booking Confirmation', 'konfidens-appointment-booking');
+//     $date = date_i18n(get_option('date_format'), strtotime($booking_data['timeslot_date']));
+//     $time = date_i18n(get_option('time_format'), strtotime($booking_data['timeslot_time']));
+//     $content = kab_get_user_confirmation_email_template($booking_data, $date, $time);
     
-    // Use SMTP-compatible From address
-    $from_email = function_exists('kab_get_from_email') ? kab_get_from_email() : get_option('admin_email');
-    $from_name = function_exists('kab_get_from_name') ? kab_get_from_name() : get_bloginfo('name');
+//     // Use SMTP-compatible From address
+//     $from_email = function_exists('kab_get_from_email') ? kab_get_from_email() : get_option('admin_email');
+//     $from_name = function_exists('kab_get_from_name') ? kab_get_from_name() : get_bloginfo('name');
     
-    $headers = array(
-        'Content-Type: text/html; charset=UTF-8',
-        'From: ' . $from_name . ' <' . $from_email . '>'
-    );
+//     $headers = array(
+//         'Content-Type: text/html; charset=UTF-8',
+//         'From: ' . $from_name . ' <' . $from_email . '>'
+//     );
     
-    return wp_mail($user_email, $subject, $content, $headers);
-}
+//     return wp_mail($user_email, $subject, $content, $headers);
+// }
 
 // Generate HTML email template for admin notification
 function kab_get_email_template($booking_data, $date, $time) {
