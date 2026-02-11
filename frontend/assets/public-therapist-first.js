@@ -58,9 +58,17 @@
             
             this.initEvents();
             
-            // Load data in background
-            this.loadTherapist();
-            this.loadCategories();
+            // When not logged in, get a fresh nonce before first load (fixes cached pages)
+            var self = this;
+            if (typeof kab_vars !== 'undefined' && !kab_vars.logged_in && window.kabRefreshPublicNonce) {
+                window.kabRefreshPublicNonce().then(function() {
+                    self.loadTherapist();
+                    self.loadCategories();
+                });
+            } else {
+                this.loadTherapist();
+                this.loadCategories();
+            }
         }
         
         /**
@@ -254,10 +262,14 @@
         
         /**
          * Load categories for the therapist (step 1) - grouped by parent categories
+         * @param {boolean} retryIfSecurityFailed - if true, on security_check_failed refresh nonce and retry once
          */
-        loadCategories() {
+        loadCategories(retryIfSecurityFailed) {
             const self = this;
             const $categoriesList = this.$form.find('.kab-categories-list');
+            if (retryIfSecurityFailed === undefined) {
+                retryIfSecurityFailed = true;
+            }
             
             // Cancel any pending request
             if (this.pendingCategoriesRequest) {
@@ -290,6 +302,17 @@
                     // Only process if this response is for the current therapist
                     if (self.loadingCategoriesForTherapistId !== loadingForTherapistId) {
                         return; // Ignore stale response
+                    }
+                    
+                    // Security check failed: refresh nonce and retry once (only when not logged in)
+                    if (response.data && response.data.code === 'security_check_failed' && retryIfSecurityFailed && !kab_vars.logged_in && (window.kabRefreshPublicNonce)) {
+                        self.pendingCategoriesRequest = null;
+                        self.isLoadingCategories = false;
+                        self.loadingCategoriesForTherapistId = null;
+                        window.kabRefreshPublicNonce().then(function() {
+                            self.loadCategories(false);
+                        });
+                        return;
                     }
                     
                     // Clear the pending request reference
@@ -385,7 +408,12 @@
                             });
                         }
                     } else {
-                        $categoriesList.html('<div class="kab-no-data">No categories available for this therapist.</div>');
+                        const msg = (response.data && response.data.message) ? response.data.message : null;
+                        if (msg) {
+                            $categoriesList.html('<div class="kab-no-data">' + msg + '</div>');
+                        } else {
+                            $categoriesList.html('<div class="kab-no-data">No categories available for this therapist.</div>');
+                        }
                     }
                 },
                 error: function(xhr, status, error) {
@@ -1476,45 +1504,49 @@
             // Get therapist_id from button
             const therapistId = $button.data('specialist-id') || $button.data('id') || '';
             
-            $popup.show();
-            requestAnimationFrame(function() {
+            // Refresh nonce before opening only when not logged in (cached pages); logged-in uses page nonce
+            const refreshPromise = (kab_vars.logged_in || !window.kabRefreshPublicNonce) ? Promise.resolve() : window.kabRefreshPublicNonce();
+            refreshPromise.then(function() {
+                $popup.show();
                 requestAnimationFrame(function() {
-                    $popup.addClass('kab-popup-open');
+                    requestAnimationFrame(function() {
+                        $popup.addClass('kab-popup-open');
+                    });
                 });
-            });
-            
-            // Handle therapist-first booking form
-            const $form = $popup.find('.kab-booking-form.kab-therapist-first');
-            if ($form.length) {
-                // Apply data attributes from button if present
-                if (therapistId) {
-                    $form.attr('data-therapist-id', therapistId);
-                }
                 
-                // Get or create form instance
-                let formInstance = $form.data('kab-form-instance');
-                if (!formInstance) {
-                    formInstance = new KABTherapistFirstBookingForm($form);
-                    $form.data('kab-form-instance', formInstance);
-                } else {
-                    // Reset form state when reopening popup
-                    // Always reset to original pre-selected therapist from button
-                    formInstance.therapistId = therapistId || '';
-                    formInstance.preselectedTherapistId = therapistId || '';
-                    formInstance.serviceId = '';
-                    formInstance.locationId = '';
-                    formInstance.selectedDate = '';
-                    formInstance.selectedTime = '';
-                    
-                    // Update form's data attribute to match button
+                // Handle therapist-first booking form
+                const $form = $popup.find('.kab-booking-form.kab-therapist-first');
+                if ($form.length) {
+                    // Apply data attributes from button if present
                     if (therapistId) {
                         $form.attr('data-therapist-id', therapistId);
                     }
                     
-                    // Reset form (will reload services for original therapist)
-                    formInstance.resetForm();
+                    // Get or create form instance
+                    let formInstance = $form.data('kab-form-instance');
+                    if (!formInstance) {
+                        formInstance = new KABTherapistFirstBookingForm($form);
+                        $form.data('kab-form-instance', formInstance);
+                    } else {
+                        // Reset form state when reopening popup
+                        // Always reset to original pre-selected therapist from button
+                        formInstance.therapistId = therapistId || '';
+                        formInstance.preselectedTherapistId = therapistId || '';
+                        formInstance.serviceId = '';
+                        formInstance.locationId = '';
+                        formInstance.selectedDate = '';
+                        formInstance.selectedTime = '';
+                        
+                        // Update form's data attribute to match button
+                        if (therapistId) {
+                            $form.attr('data-therapist-id', therapistId);
+                        }
+                        
+                        // Reset form (will reload services for original therapist)
+                        formInstance.resetForm();
+                    }
                 }
-            }
+            });
         });
     });
 

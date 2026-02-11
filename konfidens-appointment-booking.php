@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.2.0
+ * Version: 1.2.3
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('KAB_VERSION', '1.2.0');
+define('KAB_VERSION', '1.2.3');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -156,6 +156,9 @@ function kab_enqueue_booking_assets() {
     wp_localize_script('kab-js', 'kab_vars', array(
         'ajax_url' => admin_url('admin-ajax.php'),
         'nonce' => wp_create_nonce('kab-public-nonce'),
+        'logged_in' => is_user_logged_in(),
+        'rest_nonce_url' => rest_url('kab/v1/public-nonce'),
+        'ajax_nonce_action' => 'kab_get_public_nonce',
         'plugin_url' => plugin_dir_url(__FILE__),
         'loading' => __('Loading...', 'konfidens-appointment-booking'),
         'error' => __('Error occurred. Please try again.', 'konfidens-appointment-booking'),
@@ -280,6 +283,32 @@ function kab_api_request($endpoint, $args = array(), $method = 'GET') {
         );
     }
 }
+
+/**
+ * REST API: return a fresh public nonce for booking forms.
+ * Used when the popup opens so cached pages (e.g. for logged-out users) get a valid nonce.
+ */
+function kab_rest_register_public_nonce() {
+    register_rest_route('kab/v1', '/public-nonce', array(
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => function () {
+            return array('nonce' => wp_create_nonce('kab-public-nonce'));
+        },
+    ));
+}
+add_action('rest_api_init', 'kab_rest_register_public_nonce');
+
+/**
+ * AJAX fallback: return a fresh public nonce (no nonce required).
+ * Used when REST API is disabled or blocked (e.g. by host/security plugin).
+ */
+function kab_ajax_get_public_nonce() {
+    nocache_headers();
+    wp_send_json_success(array('nonce' => wp_create_nonce('kab-public-nonce')));
+}
+add_action('wp_ajax_kab_get_public_nonce', 'kab_ajax_get_public_nonce');
+add_action('wp_ajax_nopriv_kab_get_public_nonce', 'kab_ajax_get_public_nonce');
 
 // Register shortcode for booking button
 function kab_register_shortcodes() {

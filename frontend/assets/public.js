@@ -6,6 +6,65 @@
     'use strict';
 
     /**
+     * Fetch a fresh public nonce and update kab_vars.nonce.
+     * Tries REST first, then admin-ajax fallback (for when REST is disabled/blocked).
+     * @returns {Promise<void>} Resolves when nonce is updated (or immediately if no URLs available).
+     */
+    window.kabRefreshPublicNonce = function() {
+        if (typeof kab_vars === 'undefined') {
+            return Promise.resolve();
+        }
+        function applyNonce(nonce) {
+            if (nonce) {
+                kab_vars.nonce = nonce;
+            }
+        }
+        function tryRest() {
+            if (!kab_vars.rest_nonce_url) {
+                return Promise.reject();
+            }
+            return $.ajax({
+                url: kab_vars.rest_nonce_url,
+                type: 'GET',
+                dataType: 'json',
+                cache: false
+            }).then(function(data) {
+                if (data && data.nonce) {
+                    applyNonce(data.nonce);
+                    return true;
+                }
+                return Promise.reject();
+            });
+        }
+        function tryAjax() {
+            if (!kab_vars.ajax_url || !kab_vars.ajax_nonce_action) {
+                return Promise.reject();
+            }
+            return $.ajax({
+                url: kab_vars.ajax_url,
+                type: 'POST',
+                data: {
+                    action: kab_vars.ajax_nonce_action,
+                    _ts: Date.now()
+                },
+                dataType: 'json',
+                cache: false
+            }).then(function(resp) {
+                if (resp && resp.success && resp.data && resp.data.nonce) {
+                    applyNonce(resp.data.nonce);
+                    return true;
+                }
+                return Promise.reject();
+            });
+        }
+        return tryRest().catch(function() {
+            return tryAjax();
+        }).catch(function() {
+            // Both failed; keep existing nonce
+        });
+    };
+
+    /**
      * Booking Form Class
      */
     class KABBookingForm {
@@ -115,7 +174,15 @@
             this.goToLogicalStep(firstLogicalStep);
             
             this.initEvents();
-            this.loadCategories();
+            // When not logged in, get a fresh nonce before first load (fixes cached pages)
+            if (typeof kab_vars !== 'undefined' && !kab_vars.logged_in && window.kabRefreshPublicNonce) {
+                var self = this;
+                window.kabRefreshPublicNonce().then(function() {
+                    self.loadCategories();
+                });
+            } else {
+                this.loadCategories();
+            }
         }
         
         /**
@@ -263,10 +330,14 @@
         
         /**
          * Load categories (step 1) - grouped by parent categories
+         * @param {boolean} retryIfSecurityFailed - if true, on security_check_failed refresh nonce and retry once
          */
-        loadCategories() {
+        loadCategories(retryIfSecurityFailed) {
             const self = this;
             const $categoriesList = this.$form.find('.kab-categories-list');
+            if (retryIfSecurityFailed === undefined) {
+                retryIfSecurityFailed = true;
+            }
             
             $categoriesList.html('<div class="kab-loading">' + kab_vars.loading + '</div>');
             
@@ -279,6 +350,12 @@
                     service_set_id: this.serviceSetId || ''
                 },
                 success: function(response) {
+                    if (response.data && response.data.code === 'security_check_failed' && retryIfSecurityFailed && !kab_vars.logged_in && (window.kabRefreshPublicNonce)) {
+                        window.kabRefreshPublicNonce().then(function() {
+                            self.loadCategories(false);
+                        });
+                        return;
+                    }
                     if (response.success && response.data.categories) {
                         const categories = response.data.categories;
                         const parentCategories = response.data.parent_categories || [];
@@ -367,7 +444,12 @@
                             });
                         }
                     } else {
-                        $categoriesList.html('<div class="kab-no-data">No categories available.</div>');
+                        const msg = (response.data && response.data.message) ? response.data.message : null;
+                        if (msg) {
+                            $categoriesList.html('<div class="kab-no-data">' + msg + '</div>');
+                        } else {
+                            $categoriesList.html('<div class="kab-no-data">No categories available.</div>');
+                        }
                     }
                 },
                 error: function() {
@@ -1685,32 +1767,36 @@
             // Get specialist_id from button (only for therapist-first flow)
             const specialistId = $button.data('specialist-id') || '';
             
-            $popup.show();
-            requestAnimationFrame(function() {
+            // Refresh nonce before opening only when not logged in (cached pages); logged-in uses page nonce
+            const refreshPromise = (kab_vars.logged_in || !window.kabRefreshPublicNonce) ? Promise.resolve() : window.kabRefreshPublicNonce();
+            refreshPromise.then(function() {
+                $popup.show();
                 requestAnimationFrame(function() {
-                    $popup.addClass('kab-popup-open');
+                    requestAnimationFrame(function() {
+                        $popup.addClass('kab-popup-open');
+                    });
                 });
-            });
-            
-            // Skip if this is a therapist-first form (handled by public-therapist-first.js)
-            const $therapistForm = $popup.find('.kab-booking-form.kab-therapist-first');
-            if ($therapistForm.length) {
-                return; // Don't process therapist-first forms here
-            }
-            
-            // Handle regular booking form
-            const $form = $popup.find('.kab-booking-form');
-            if ($form.length) {
-                // Get or create form instance
-                let formInstance = $form.data('kab-form-instance');
-                if (!formInstance) {
-                    formInstance = new KABBookingForm($form);
-                    $form.data('kab-form-instance', formInstance);
-                } else {
-                    // Reset form (will recalculate step mapping and go to correct step)
-                    formInstance.resetForm();
+                
+                // Skip if this is a therapist-first form (handled by public-therapist-first.js)
+                const $therapistForm = $popup.find('.kab-booking-form.kab-therapist-first');
+                if ($therapistForm.length) {
+                    return; // Don't process therapist-first forms here
                 }
-            }
+                
+                // Handle regular booking form
+                const $form = $popup.find('.kab-booking-form');
+                if ($form.length) {
+                    // Get or create form instance
+                    let formInstance = $form.data('kab-form-instance');
+                    if (!formInstance) {
+                        formInstance = new KABBookingForm($form);
+                        $form.data('kab-form-instance', formInstance);
+                    } else {
+                        // Reset form (will recalculate step mapping and go to correct step)
+                        formInstance.resetForm();
+                    }
+                }
+            });
         });
         
         $('.kab-popup-close').click(function() {

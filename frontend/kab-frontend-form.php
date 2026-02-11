@@ -100,7 +100,7 @@ function kab_get_locations_by_service_set($set_id) {
 function kab_get_categories_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check if service set is provided
@@ -145,7 +145,7 @@ add_action('wp_ajax_nopriv_kab_get_categories', 'kab_get_categories_ajax');
 function kab_get_services() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Try cache first (5 minute cache)
@@ -180,7 +180,7 @@ add_action('wp_ajax_nopriv_kab_get_services', 'kab_get_services');
 function kab_get_locations_by_category_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -284,7 +284,7 @@ function kab_fetch_service_from_api($service_id) {
 function kab_get_service_price_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -369,7 +369,7 @@ add_action('wp_ajax_nopriv_kab_get_service_price', 'kab_get_service_price_ajax')
 function kab_get_service_by_category_location_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -455,7 +455,7 @@ add_action('wp_ajax_nopriv_kab_get_service_by_category_location', 'kab_get_servi
 function kab_get_locations_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -509,7 +509,7 @@ add_action('wp_ajax_nopriv_kab_get_locations', 'kab_get_locations_ajax');
 function kab_get_specialists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -583,7 +583,7 @@ add_action('wp_ajax_nopriv_kab_get_specialists', 'kab_get_specialists_ajax');
 function kab_get_all_therapists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check if service set is provided
@@ -696,7 +696,7 @@ add_action('wp_ajax_nopriv_kab_get_all_therapists', 'kab_get_all_therapists_ajax
 function kab_get_services_for_therapist_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -830,7 +830,7 @@ add_action('wp_ajax_nopriv_kab_get_services_for_therapist', 'kab_get_services_fo
 function kab_get_categories_for_therapist_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -953,7 +953,7 @@ add_action('wp_ajax_nopriv_kab_get_categories_for_therapist', 'kab_get_categorie
 function kab_get_specialist_locations_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -975,7 +975,7 @@ add_action('wp_ajax_nopriv_kab_get_specialist_locations', 'kab_get_specialist_lo
 function kab_get_locations_for_therapist_service_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -1033,7 +1033,7 @@ add_action('wp_ajax_nopriv_kab_get_locations_for_therapist_service', 'kab_get_lo
 function kab_get_available_dates() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -1132,7 +1132,7 @@ add_action('wp_ajax_nopriv_kab_get_available_dates', 'kab_get_available_dates');
 function kab_get_timeslots_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
@@ -1200,7 +1200,7 @@ add_action('wp_ajax_nopriv_kab_get_timeslots', 'kab_get_timeslots_ajax');
 function kab_create_booking() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
