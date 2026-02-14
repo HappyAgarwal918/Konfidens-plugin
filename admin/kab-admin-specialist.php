@@ -3,9 +3,31 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Display therapists page: Show all therapists and manage tags + profession
+// Display therapists page: Show all therapists and manage tags + profession + locations
 function kab_display_therapists_page() {
     $therapists = kab_get_all_therapists();
+    
+    // Get locations and location categories for the Locations column (like services page)
+    $locations = kab_get_locations();
+    $location_categories = kab_get_location_categories();
+    $location_categories_map = array();
+    foreach ($location_categories as $loc_cat) {
+        $location_categories_map[$loc_cat->id] = $loc_cat->category_name;
+    }
+    
+    // Batch load specialist location_ids from database
+    $specialist_locations_map = array();
+    if (!empty($therapists)) {
+        global $wpdb;
+        $location_specialist_table = $wpdb->prefix . 'kab_location_specialist';
+        $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'location_ids'");
+        if (!empty($column_exists)) {
+            $rows = $wpdb->get_results("SELECT specialist_id, location_ids FROM $location_specialist_table");
+            foreach ($rows as $row) {
+                $specialist_locations_map[$row->specialist_id] = !empty($row->location_ids) ? $row->location_ids : '';
+            }
+        }
+    }
     
     ?>
     <div class="wrap kab-admin">
@@ -38,6 +60,7 @@ function kab_display_therapists_page() {
                             <th><?php _e('Name', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Profession', 'konfidens-appointment-booking'); ?></th>
                             <th><?php _e('Tags', 'konfidens-appointment-booking'); ?></th>
+                            <th><?php _e('Locations', 'konfidens-appointment-booking'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -46,6 +69,8 @@ function kab_display_therapists_page() {
                             $therapist_tags = kab_get_specialist_tags($therapist['id']);
                             $tags_string = !empty($therapist_tags) ? implode(', ', $therapist_tags) : '';
                             $therapist_profession = kab_get_specialist_profession($therapist['id']);
+                            $therapist_location_ids = isset($specialist_locations_map[$therapist['id']]) ? $specialist_locations_map[$therapist['id']] : '';
+                            $therapist_location_ids_array = !empty($therapist_location_ids) ? array_map('trim', explode(',', $therapist_location_ids)) : array();
                             ?>
                             <tr>
                                 <td><?php echo esc_html($therapist['id']); ?></td>
@@ -76,6 +101,31 @@ function kab_display_therapists_page() {
                                     <p class="description" style="margin-top: 5px; font-size: 11px; color: #666;">
                                         <?php _e('Separate tags with commas', 'konfidens-appointment-booking'); ?>
                                     </p>
+                                </td>
+                                <td>
+                                    <div class="kab-therapist-location-checkboxes" data-therapist-id="<?php echo esc_attr($therapist['id']); ?>" style="max-width: 100%;">
+                                        <?php if (empty($locations)): ?>
+                                            <span style="color: #999;"><?php _e('No locations available', 'konfidens-appointment-booking'); ?></span>
+                                        <?php else: ?>
+                                            <?php foreach ($locations as $location): 
+                                                $display_name = esc_html($location->location_name);
+                                                if (!empty($location->category_id) && isset($location_categories_map[$location->category_id])) {
+                                                    $display_name .= ' (' . esc_html($location_categories_map[$location->category_id]) . ')';
+                                                }
+                                            ?>
+                                                <label style="display: block; margin: 5px 0;">
+                                                    <input type="checkbox" 
+                                                           class="kab-therapist-location-checkbox" 
+                                                           value="<?php echo esc_attr($location->id); ?>"
+                                                           <?php checked(in_array((string)$location->id, $therapist_location_ids_array)); ?>>
+                                                    <?php echo $display_name; ?>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <span class="kab-therapist-location-save-status" id="therapist-location-save-status-<?php echo esc_attr($therapist['id']); ?>" style="display: none; margin-left: 10px; color: green; font-style: italic;">
+                                        <?php _e('Saved!', 'konfidens-appointment-booking'); ?>
+                                    </span>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -148,6 +198,42 @@ function kab_display_therapists_page() {
                     }
                 });
             }, 1000);
+        });
+        // Therapist location checkboxes (same pattern as service locations)
+        $('.kab-therapist-location-checkbox').on('change', function() {
+            var $container = $(this).closest('.kab-therapist-location-checkboxes');
+            var therapistId = $container.data('therapist-id');
+            var locationCheckboxes = $container.find('.kab-therapist-location-checkbox');
+            var selectedLocations = [];
+            locationCheckboxes.each(function() {
+                if ($(this).is(':checked')) {
+                    selectedLocations.push($(this).val());
+                }
+            });
+            var locationIds = selectedLocations.join(',');
+            var saveStatus = $('#therapist-location-save-status-' + therapistId);
+            saveStatus.text('<?php _e("Saving...", "konfidens-appointment-booking"); ?>').css('color', '#666').show();
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'kab_update_specialist_locations',
+                    specialist_id: therapistId,
+                    location_ids: locationIds,
+                    nonce: '<?php echo wp_create_nonce("kab-admin-nonce"); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        saveStatus.text('<?php _e("Saved!", "konfidens-appointment-booking"); ?>').css('color', 'green');
+                        setTimeout(function() { saveStatus.fadeOut(500); }, 2000);
+                    } else {
+                        saveStatus.text(response.data && response.data.message ? response.data.message : '<?php _e("Error saving locations", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                    }
+                },
+                error: function(xhr) {
+                    saveStatus.text(xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message ? xhr.responseJSON.data.message : '<?php _e("Error saving locations", "konfidens-appointment-booking"); ?>').css('color', 'red');
+                }
+            });
         });
     });
     </script>
@@ -334,3 +420,32 @@ function kab_update_specialist_profession_ajax() {
     }
 }
 add_action('wp_ajax_kab_update_specialist_profession', 'kab_update_specialist_profession_ajax');
+
+/**
+ * AJAX handler for updating specialist locations
+ */
+function kab_update_specialist_locations_ajax() {
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-admin-nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking')));
+    }
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'konfidens-appointment-booking')));
+    }
+    if (!isset($_POST['specialist_id']) || empty($_POST['specialist_id'])) {
+        wp_send_json_error(array('message' => __('Specialist ID is required.', 'konfidens-appointment-booking')));
+    }
+    $specialist_id = sanitize_text_field($_POST['specialist_id']);
+    $location_ids = isset($_POST['location_ids']) ? sanitize_text_field($_POST['location_ids']) : '';
+    $result = kab_add_update_specialist_locations($specialist_id, $location_ids);
+    if ($result) {
+        wp_send_json_success(array('message' => __('Therapist locations updated successfully.', 'konfidens-appointment-booking')));
+    } else {
+        global $wpdb;
+        $error_message = __('Failed to update therapist locations.', 'konfidens-appointment-booking');
+        if ($wpdb->last_error) {
+            $error_message .= ' ' . $wpdb->last_error;
+        }
+        wp_send_json_error(array('message' => $error_message));
+    }
+}
+add_action('wp_ajax_kab_update_specialist_locations', 'kab_update_specialist_locations_ajax');

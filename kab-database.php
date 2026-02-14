@@ -125,6 +125,12 @@ function kab_create_tables() {
         $wpdb->query("ALTER TABLE $location_specialist_table ADD COLUMN profession varchar(255) DEFAULT '' AFTER tags");
     }
     
+    // Add location_ids column if it doesn't exist (comma-separated location IDs per therapist)
+    $location_ids_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'location_ids'");
+    if (empty($location_ids_exists)) {
+        $wpdb->query("ALTER TABLE $location_specialist_table ADD COLUMN location_ids text DEFAULT '' AFTER profession");
+    }
+    
     // Create booking form data table
     $booking_form_data_table = $wpdb->prefix . 'kab_booking_form_data';
     $wpdb->query("CREATE TABLE IF NOT EXISTS $booking_form_data_table (
@@ -290,6 +296,7 @@ function kab_delete_location($id) {
     global $wpdb;
     $location_table = $wpdb->prefix . 'kab_location';
     $location_service_table = $wpdb->prefix . 'kab_location_service';
+    $location_specialist_table = $wpdb->prefix . 'kab_location_specialist';
     
     // First, remove the deleted location ID from all service assignments
     // Get all service records that have this location ID (handle comma-separated location_ids)
@@ -313,6 +320,28 @@ function kab_delete_location($id) {
                 $updated_location_ids,
                 $service->service_id
             ));
+        }
+    }
+    
+    // Remove the deleted location ID from all specialist assignments (if column exists)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $location_specialist_table LIKE 'location_ids'");
+    if (!empty($column_exists)) {
+        $all_specialists = $wpdb->get_results(
+            "SELECT specialist_id, location_ids FROM $location_specialist_table WHERE location_ids != '' AND location_ids IS NOT NULL"
+        );
+        foreach ($all_specialists as $specialist) {
+            if (!empty($specialist->location_ids)) {
+                $location_ids = array_map('trim', explode(',', $specialist->location_ids));
+                $location_ids = array_filter($location_ids, function($loc_id) use ($id) {
+                    return $loc_id != $id;
+                });
+                $updated_location_ids = !empty($location_ids) ? implode(',', $location_ids) : '';
+                $wpdb->query($wpdb->prepare(
+                    "UPDATE $location_specialist_table SET location_ids = %s WHERE specialist_id = %s",
+                    $updated_location_ids,
+                    $specialist->specialist_id
+                ));
+            }
         }
     }
     
@@ -645,6 +674,54 @@ function kab_add_update_service_location($service_id, $location_ids, $category_i
             return $result ? $wpdb->insert_id : false;
         }
     }
+}
+
+/**
+ * Get specialist locations (returns comma-separated location IDs)
+ */
+function kab_get_specialist_locations($specialist_id) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'location_ids'");
+    if (empty($column_exists)) {
+        return '';
+    }
+    $row = $wpdb->get_row($wpdb->prepare("SELECT location_ids FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    return ($row && $row->location_ids !== null && $row->location_ids !== '') ? $row->location_ids : '';
+}
+
+/**
+ * Add or update specialist location assignments
+ */
+function kab_add_update_specialist_locations($specialist_id, $location_ids) {
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'location_ids'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN location_ids text DEFAULT '' AFTER profession");
+    }
+    $location_ids = is_array($location_ids) ? implode(',', array_map('intval', $location_ids)) : sanitize_text_field($location_ids);
+    $existing = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table_name WHERE specialist_id = %s", $specialist_id));
+    if ($existing) {
+        return $wpdb->update(
+            $table_name,
+            array('location_ids' => $location_ids),
+            array('specialist_id' => $specialist_id),
+            array('%s'),
+            array('%s')
+        ) !== false;
+    }
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'specialist_id' => sanitize_text_field($specialist_id),
+            'tags' => '',
+            'profession' => '',
+            'location_ids' => $location_ids
+        ),
+        array('%s', '%s', '%s', '%s')
+    );
+    return $result ? $wpdb->insert_id : false;
 }
 
 /**
