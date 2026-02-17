@@ -239,6 +239,20 @@ function kab_get_locations_by_category_ajax() {
             }
         }
         $locations = $filtered_locations;
+        
+        // Also filter by therapist's assigned locations: only show locations the therapist is assigned to
+        $therapist_location_ids = kab_get_specialist_locations($therapist_id);
+        if ($therapist_location_ids !== '') {
+            $ids = array_map('trim', explode(',', $therapist_location_ids));
+            $therapist_location_ids_set = array_flip($ids);
+            $filtered_locations = array();
+            foreach ($locations as $location) {
+                if (isset($therapist_location_ids_set[(string) $location->id])) {
+                    $filtered_locations[] = $location;
+                }
+            }
+            $locations = $filtered_locations;
+        }
     }
     
     // Get all location categories for grouping

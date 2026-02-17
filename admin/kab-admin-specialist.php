@@ -335,11 +335,27 @@ function kab_get_therapists_for_service($service_id) {
 
 /**
  * Get therapists for a service and location
- * Note: Location filtering has been removed - this function now returns all therapists for the service
+ * Returns therapists who provide the service AND (if they have locations assigned) are assigned to the given location.
  */
 function kab_get_therapists_for_service_location($service_id, $location_id) {
-    // Location filtering removed - return all therapists for the service
-    return kab_get_therapists_for_service($service_id);
+    $therapists = kab_get_therapists_for_service($service_id);
+    if (empty($therapists) || empty($location_id)) {
+        return $therapists;
+    }
+    $filtered = array();
+    foreach ($therapists as $therapist) {
+        $therapist_location_ids = kab_get_specialist_locations($therapist['id']);
+        // No locations assigned = therapist works at all locations for this service
+        if ($therapist_location_ids === '') {
+            $filtered[] = $therapist;
+            continue;
+        }
+        $ids = array_map('trim', explode(',', $therapist_location_ids));
+        if (in_array((string) $location_id, $ids)) {
+            $filtered[] = $therapist;
+        }
+    }
+    return $filtered;
 }
 
 /**

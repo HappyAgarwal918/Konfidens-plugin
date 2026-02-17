@@ -5,6 +5,13 @@
 (function($) {
     'use strict';
 
+    /** Push to GTM dataLayer and log to console for debugging */
+    function kabDataLayerPush(obj) {
+        window.dataLayer = window.dataLayer || [];
+        dataLayer.push(obj);
+        console.log('[KAB GTM] dataLayer.push', obj);
+    }
+
     /**
      * Fetch a fresh public nonce and update kab_vars.nonce.
      * Tries REST first, then admin-ajax fallback (for when REST is disabled/blocked).
@@ -93,6 +100,10 @@
             this.isLoadingSpecialists = false; // Flag to prevent multiple simultaneous specialist loads
             this.isSubmitting = false; // Flag to prevent double booking submission
             this.serviceSetId = this.$form.data('service-set') || ''; // Get service set ID from data attribute
+            // GA4 / GTM event tracking (one event per type per booking attempt)
+            this.ga4Fired = {};
+            this.bookingCompleted = false;
+            this.isRandomSpecialist = false;
             
             // Determine which steps are visible and create step mapping
             this.setupStepMapping();
@@ -174,6 +185,10 @@
             this.goToLogicalStep(firstLogicalStep);
             
             this.initEvents();
+            // GA4: fire booking_started for inline form (no popup)
+            if (!this.$form.closest('.kab-popup').length) {
+                kabDataLayerPush({ event: 'booking_started', booking_step: 1 });
+            }
             // When not logged in, get a fresh nonce before first load (fixes cached pages)
             if (typeof kab_vars !== 'undefined' && !kab_vars.logged_in && window.kabRefreshPublicNonce) {
                 var self = this;
@@ -311,12 +326,13 @@
             
             // Close window button
             this.$form.on('click', '.kab-close-window-btn', function() {
-                // If in a popup, close it; otherwise, just hide the form or redirect
+                if (!self.bookingCompleted) {
+                    kabDataLayerPush({ event: 'booking_abandoned', last_step: self.currentLogicalStep });
+                }
                 const $popup = self.$form.closest('.kab-popup');
                 if ($popup.length) {
                     $popup.fadeOut(300);
                 } else {
-                    // If not in popup, could redirect to home or hide form
                     window.location.href = '/';
                 }
             });
@@ -324,6 +340,7 @@
             // Random specialist selection (click on label or button)
             this.$form.on('click', '.kab-random-specialist-wrap', function(e) {
                 e.preventDefault();
+                self.isRandomSpecialist = true;
                 self.selectRandomSpecialist();
             });
         }
@@ -1053,8 +1070,30 @@
                 }
             }
             
-            // Get next logical step
+            // GA4/GTM: fire step event when advancing (once per booking attempt)
             const nextLogicalStep = this.currentLogicalStep + 1;
+            if (nextLogicalStep > this.currentLogicalStep && nextLogicalStep <= this.maxStep) {
+                if (this.currentLogicalStep === 1 && !this.ga4Fired.booking_service_selected) {
+                    const serviceType = this.$form.find('.kab-category-item[data-category-id].selected .kab-category-name').text().trim() || '';
+                    if (serviceType) {
+                        this.ga4Fired.booking_service_selected = true;
+                        kabDataLayerPush({ event: 'booking_service_selected', booking_step: 2, service_type: serviceType });
+                    }
+                } else if (this.currentLogicalStep === 2 && !this.ga4Fired.booking_location_selected) {
+                    const locationType = this.$form.find('.kab-category-item[data-location-id].selected .kab-category-name').text().trim() || '';
+                    if (locationType) {
+                        this.ga4Fired.booking_location_selected = true;
+                        kabDataLayerPush({ event: 'booking_location_selected', booking_step: 3, location_type: locationType });
+                    }
+                } else if (this.currentLogicalStep === 3 && !this.ga4Fired.booking_therapist_selected) {
+                    this.ga4Fired.booking_therapist_selected = true;
+                    kabDataLayerPush({ event: 'booking_therapist_selected', booking_step: 4, therapist_random: !!this.isRandomSpecialist });
+                } else if (this.currentLogicalStep === 4 && !this.ga4Fired.booking_datetime_selected) {
+                    this.ga4Fired.booking_datetime_selected = true;
+                    kabDataLayerPush({ event: 'booking_datetime_selected', booking_step: 5 });
+                }
+            }
+            
             if (nextLogicalStep <= this.maxStep) {
                 this.goToLogicalStep(nextLogicalStep);
             }
@@ -1181,6 +1220,9 @@
             this.categoryId = '';
             this.selectedDate = '';
             this.selectedTime = '';
+            this.ga4Fired = {};
+            this.bookingCompleted = false;
+            this.isRandomSpecialist = false;
             
             // Reset UI selections
             this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
@@ -1323,6 +1365,7 @@
          */
         selectSpecialist(specialistId) {
             this.specialistId = specialistId;
+            this.isRandomSpecialist = false; // User selected a specific therapist (random sets true before calling this)
             
             // Update UI
             this.$form.find('.kab-specialist-card').removeClass('selected');
@@ -1730,11 +1773,21 @@
                     self.isSubmitting = false;
                     $loading.hide();
                     if (response.success) {
+                        self.bookingCompleted = true;
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message);
+                        var priceText = self.$form.find('.kab-summary-price').text().replace(/[^\d.,]/g, '').replace(',', '.');
+                        var bookingValue = parseFloat(priceText) || 0;
+                        kabDataLayerPush({
+                            event: 'booking_completed',
+                            booking_step: 6,
+                            transaction_id: (response.data && (response.data.booking_id || response.data.transaction_id)) ? String(response.data.booking_id || response.data.transaction_id) : '',
+                            booking_value: bookingValue
+                        });
                     } else {
                         $error.show();
                         $error.find('.kab-error-message').text(response.data.message);
+                        kabDataLayerPush({ event: 'booking_failed', booking_step: 6 });
                     }
                 },
                 error: function() {
@@ -1742,6 +1795,7 @@
                     $loading.hide();
                     $error.show();
                     $error.find('.kab-error-message').text(kab_vars.error);
+                    kabDataLayerPush({ event: 'booking_failed', booking_step: 6 });
                 }
             });
         }
@@ -1786,21 +1840,36 @@
                 // Handle regular booking form
                 const $form = $popup.find('.kab-booking-form');
                 if ($form.length) {
-                    // Get or create form instance
                     let formInstance = $form.data('kab-form-instance');
                     if (!formInstance) {
                         formInstance = new KABBookingForm($form);
                         $form.data('kab-form-instance', formInstance);
                     } else {
-                        // Reset form (will recalculate step mapping and go to correct step)
                         formInstance.resetForm();
                     }
+                    formInstance.ga4Fired = {};
+                    formInstance.bookingCompleted = false;
+                    kabDataLayerPush({ event: 'booking_started', booking_step: 1 });
                 }
             });
         });
         
         $('.kab-popup-close').click(function() {
             const $p = $(this).closest('.kab-popup');
+            const $stdForm = $p.find('.kab-booking-form').not('.kab-therapist-first');
+            const $tfForm = $p.find('.kab-booking-form.kab-therapist-first');
+            if ($stdForm.length) {
+                const inst = $stdForm.data('kab-form-instance');
+                if (inst && !inst.bookingCompleted) {
+                    kabDataLayerPush({ event: 'booking_abandoned', last_step: inst.currentLogicalStep });
+                }
+            }
+            if ($tfForm.length) {
+                const inst = $tfForm.data('kab-form-instance');
+                if (inst && !inst.bookingCompleted) {
+                    kabDataLayerPush({ event: 'booking_abandoned', last_step: inst.currentStep });
+                }
+            }
             $p.removeClass('kab-popup-open');
             setTimeout(function() { $p.hide(); }, 350);
         });
@@ -1808,6 +1877,20 @@
         $(window).click(function(e) {
             if ($(e.target).hasClass('kab-popup-overlay')) {
                 const $p = $(e.target).closest('.kab-popup');
+                const $stdForm = $p.find('.kab-booking-form').not('.kab-therapist-first');
+                const $tfForm = $p.find('.kab-booking-form.kab-therapist-first');
+                if ($stdForm.length) {
+                    const inst = $stdForm.data('kab-form-instance');
+                    if (inst && !inst.bookingCompleted) {
+                        kabDataLayerPush({ event: 'booking_abandoned', last_step: inst.currentLogicalStep });
+                    }
+                }
+                if ($tfForm.length) {
+                    const inst = $tfForm.data('kab-form-instance');
+                    if (inst && !inst.bookingCompleted) {
+                        kabDataLayerPush({ event: 'booking_abandoned', last_step: inst.currentStep });
+                    }
+                }
                 $p.removeClass('kab-popup-open');
                 setTimeout(function() { $p.hide(); }, 350);
             }

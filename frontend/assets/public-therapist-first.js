@@ -5,6 +5,13 @@
 (function($) {
     'use strict';
 
+    /** Push to GTM dataLayer and log to console for debugging */
+    function kabDataLayerPush(obj) {
+        window.dataLayer = window.dataLayer || [];
+        dataLayer.push(obj);
+        console.log('[KAB GTM] dataLayer.push', obj);
+    }
+
     /**
      * Booking Form Class for Therapist-First Flow
      */
@@ -38,6 +45,9 @@
             this.loadingCategoriesForTherapistId = null;
             this.isLoadingCategories = false;
             this.isSubmitting = false; // Prevent double booking submission
+            // GA4 / GTM event tracking (one event per type per booking attempt)
+            this.ga4Fired = {};
+            this.bookingCompleted = false;
             
             this.init();
         }
@@ -57,6 +67,10 @@
             this.goToStep(1);
             
             this.initEvents();
+            // GA4: fire booking_started for inline therapist-first form
+            if (!this.$form.closest('.kab-popup').length) {
+                kabDataLayerPush({ event: 'booking_started', booking_step: 1 });
+            }
             
             // When not logged in, get a fresh nonce before first load (fixes cached pages)
             var self = this;
@@ -159,12 +173,13 @@
             
             // Close window button
             this.$form.on('click', '.kab-close-window-btn', function() {
-                // If in a popup, close it; otherwise, just hide the form or redirect
+                if (!self.bookingCompleted) {
+                    kabDataLayerPush({ event: 'booking_abandoned', last_step: self.currentStep });
+                }
                 const $popup = self.$form.closest('.kab-popup');
                 if ($popup.length) {
                     $popup.fadeOut(300);
                 } else {
-                    // If not in popup, could redirect to home or hide form
                     window.location.href = '/';
                 }
             });
@@ -929,6 +944,26 @@
          */
         nextStep() {
             if (this.currentStep < this.maxStep) {
+                // GA4/GTM: fire step event when advancing (once per booking attempt)
+                if (this.currentStep === 0 && !this.ga4Fired.booking_therapist_selected) {
+                    this.ga4Fired.booking_therapist_selected = true;
+                    kabDataLayerPush({ event: 'booking_therapist_selected', booking_step: 4, therapist_random: false });
+                } else if (this.currentStep === 1 && !this.ga4Fired.booking_service_selected) {
+                    var serviceType = this.$form.find('.kab-category-item[data-category-id].selected .kab-category-name').text().trim() || this.$form.find('.kab-category-item[data-category-id].selected').find('.kab-category-name').text().trim() || '';
+                    if (serviceType) {
+                        this.ga4Fired.booking_service_selected = true;
+                        kabDataLayerPush({ event: 'booking_service_selected', booking_step: 2, service_type: serviceType });
+                    }
+                } else if (this.currentStep === 2 && !this.ga4Fired.booking_location_selected) {
+                    var locationType = this.$form.find('.kab-category-item[data-location-id].selected .kab-category-name').text().trim() || this.$form.find('.kab-category-item[data-location-id].selected').find('.kab-category-name').text().trim() || '';
+                    if (locationType) {
+                        this.ga4Fired.booking_location_selected = true;
+                        kabDataLayerPush({ event: 'booking_location_selected', booking_step: 3, location_type: locationType });
+                    }
+                } else if (this.currentStep === 3 && !this.ga4Fired.booking_datetime_selected) {
+                    this.ga4Fired.booking_datetime_selected = true;
+                    kabDataLayerPush({ event: 'booking_datetime_selected', booking_step: 5 });
+                }
                 this.goToStep(this.currentStep + 1);
             }
         }
@@ -1355,6 +1390,8 @@
             this.categoryId = '';
             this.selectedDate = '';
             this.selectedTime = '';
+            this.ga4Fired = {};
+            this.bookingCompleted = false;
             
             // Reset UI selections
             this.$form.find('.kab-category-item[data-category-id]').removeClass('selected');
@@ -1467,11 +1504,21 @@
                     self.isSubmitting = false;
                     $loading.hide();
                     if (response.success) {
+                        self.bookingCompleted = true;
                         $success.show();
                         $success.find('.kab-booking-message').html(response.data.message || 'Booking created successfully.');
+                        var priceText = self.$form.find('.kab-summary-price').text().replace(/[^\d.,]/g, '').replace(',', '.');
+                        var bookingValue = parseFloat(priceText) || 0;
+                        kabDataLayerPush({
+                            event: 'booking_completed',
+                            booking_step: 6,
+                            transaction_id: (response.data && (response.data.booking_id || response.data.transaction_id)) ? String(response.data.booking_id || response.data.transaction_id) : '',
+                            booking_value: bookingValue
+                        });
                     } else {
                         $error.show();
                         $error.find('.kab-error-message').text(response.data.message || kab_vars.error);
+                        kabDataLayerPush({ event: 'booking_failed', booking_step: 6 });
                     }
                 },
                 error: function() {
@@ -1479,6 +1526,7 @@
                     $loading.hide();
                     $error.show();
                     $error.find('.kab-error-message').text(kab_vars.error);
+                    kabDataLayerPush({ event: 'booking_failed', booking_step: 6 });
                 }
             });
         }
@@ -1545,6 +1593,9 @@
                         // Reset form (will reload services for original therapist)
                         formInstance.resetForm();
                     }
+                    formInstance.ga4Fired = {};
+                    formInstance.bookingCompleted = false;
+                    kabDataLayerPush({ event: 'booking_started', booking_step: 1 });
                 }
             });
         });
