@@ -169,6 +169,7 @@
             this.$form.on('click', '.kab-book-new-btn', function() {
                 // Reset form and go back to step 1
                 self.resetForm();
+                kabDataLayerPush({ event: 'booking_started', booking_step: 1 });
             });
             
             // Close window button
