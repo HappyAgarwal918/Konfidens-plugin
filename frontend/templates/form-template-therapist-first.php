@@ -100,7 +100,7 @@ $form_classes[] = 'kab-context-' . $context;
                     </div>
                     
                     <div class="kab-time-slots-container">
-                        <h4><?php _e('Available Time Slots', 'konfidens-appointment-booking'); ?></h4>
+                        <h4><?php _e('Tilgjengelige tider', 'konfidens-appointment-booking'); ?></h4>
                         <div class="kab-time-slots">
                             <div class="kab-no-date-selected">
                                 <?php _e('Please select a date to view available time slots.', 'konfidens-appointment-booking'); ?>

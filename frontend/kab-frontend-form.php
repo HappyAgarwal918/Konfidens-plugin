@@ -164,9 +164,9 @@ function kab_get_services() {
         'services' => $services
     );
     
-    // Cache for 5 minutes
-    set_transient($cache_key, $result, 300);
-    
+    // Cache for 30 minutes
+    set_transient($cache_key, $result, 1800);
+
     if (!empty($services)) {
         wp_send_json_success($result);
     } else {
@@ -257,12 +257,9 @@ function kab_get_locations_by_category_ajax() {
     
     // Get all location categories for grouping
     $location_categories = kab_get_location_categories();
-    
-    // Add category_id to each location
-    foreach ($locations as &$location) {
-        $location->category_id = kab_get_location_category_id($location->id);
-    }
-    
+
+    // category_id is already included in the SELECT * result — no extra DB query needed per location
+
     if (!empty($locations)) {
         wp_send_json_success(array(
             'locations' => $locations,
@@ -276,20 +273,42 @@ add_action('wp_ajax_kab_get_locations_by_category', 'kab_get_locations_by_catego
 add_action('wp_ajax_nopriv_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
 
 /**
- 
-* Fetch service directly from API (for price in last step - always fresh
+ * Fetch service by ID using cached data (no direct API call).
+ * Checks the filtered (enabled) list first, then falls back to the full unfiltered cache
+ * so price lookups work even for services filtered out of the main list.
  */
 function kab_fetch_service_from_api($service_id) {
-    $services_response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
-    if (!$services_response['success'] || empty($services_response['data'])) {
-        return null;
+    // Common case: service is in the filtered/enabled list
+    foreach (kab_get_services_with_priority() as $s) {
+        if ((string) $s['id'] === (string) $service_id) {
+            return $s;
+        }
     }
-    foreach ($services_response['data'] as $s) {
+    // Fallback: unfiltered cache (covers disabled / non-standard services)
+    foreach (kab_get_all_services_raw_cached() as $s) {
         if ((string) $s['id'] === (string) $service_id) {
             return $s;
         }
     }
     return null;
+}
+
+/**
+ * Return all services from the API (no enabled-only filter), cached for 30 minutes.
+ */
+function kab_get_all_services_raw_cached() {
+    $cache_key = 'kab_all_services_raw';
+    $cached = get_transient($cache_key);
+    if ($cached !== false && is_array($cached)) {
+        return $cached;
+    }
+    $response = kab_api_request('services', array('clinic_id' => get_option('kab_clinic_id', '')));
+    if ($response['success'] && !empty($response['data'])) {
+        $services = $response['data'];
+        set_transient($cache_key, $services, 1800);
+        return $services;
+    }
+    return array();
 }
 
 /**
@@ -307,9 +326,17 @@ function kab_get_service_price_ajax() {
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
-    
-    // Fetch service directly from API for accurate price in last step
-    $service = kab_fetch_service_from_api($service_id);
+
+    // Use raw (unprocessed) services cache so all original API price fields are intact.
+    // kab_get_services_with_priority() preprocesses price to a string which can interfere
+    // with the extraction logic below; raw data guarantees the correct format.
+    $service = null;
+    foreach (kab_get_all_services_raw_cached() as $s) {
+        if ((string) $s['id'] === (string) $service_id) {
+            $service = $s;
+            break;
+        }
+    }
     if (!$service) {
         wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
     }
@@ -400,22 +427,21 @@ function kab_get_service_by_category_location_ajax() {
     $service_id = kab_get_service_by_category_location($category_id, $location_id);
     
     if (!empty($service_id)) {
-        // Fetch service directly from API
         $service = kab_fetch_service_from_api($service_id);
-        
+
         if ($service) {
             // If therapist_id is provided, validate that the therapist provides this service
             if (!empty($therapist_id)) {
                 $therapists_for_service = kab_get_therapists_for_service($service_id);
                 $therapist_provides_service = false;
-                
+
                 foreach ($therapists_for_service as $therapist) {
                     if ($therapist['id'] === $therapist_id) {
                         $therapist_provides_service = true;
                         break;
                     }
                 }
-                
+
                 if (!$therapist_provides_service) {
                     wp_send_json_error(array(
                         'message' => __('The selected therapist does not provide this service for the selected category and location combination.', 'konfidens-appointment-booking'),
@@ -424,37 +450,10 @@ function kab_get_service_by_category_location_ajax() {
                     return;
                 }
             }
-            
+
             wp_send_json_success(array('service' => $service));
         } else {
-            // Fallback: try fetching directly from API
-            $service = kab_fetch_service_from_api($service_id);
-            if ($service && !empty($service)) {
-                // If therapist_id is provided, validate that the therapist provides this service
-                if (!empty($therapist_id)) {
-                    $therapists_for_service = kab_get_therapists_for_service($service_id);
-                    $therapist_provides_service = false;
-                    
-                    foreach ($therapists_for_service as $therapist) {
-                        if ($therapist['id'] === $therapist_id) {
-                            $therapist_provides_service = true;
-                            break;
-                        }
-                    }
-                    
-                    if (!$therapist_provides_service) {
-                        wp_send_json_error(array(
-                            'message' => __('The selected therapist does not provide this service for the selected category and location combination.', 'konfidens-appointment-booking'),
-                            'therapist_invalid' => true
-                        ));
-                        return;
-                    }
-                }
-                
-                wp_send_json_success(array('service' => $service));
-            } else {
-                wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
-            }
+            wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
         }
     } else {
         wp_send_json_error(array('message' => __('No service available for this category and location combination.', 'konfidens-appointment-booking')));
@@ -483,28 +482,21 @@ function kab_get_locations_ajax() {
     $service_location_ids = kab_get_service_locations($service_id);
     
     if (!empty($service_location_ids)) {
-        $locations = array();
-        // Split comma-separated location IDs
-        $location_ids_array = array_map('trim', explode(',', $service_location_ids));
-        
-        foreach ($location_ids_array as $location_id) {
-            if (!empty($location_id)) {
-                $location = kab_get_location_by_id($location_id);
-                if ($location) {
-                    $locations[] = $location;
-                }
-            }
+        // Batch-load all locations in one query instead of N individual queries
+        $location_ids_array = array_filter(array_map('intval', array_map('trim', explode(',', $service_location_ids))));
+
+        if (!empty($location_ids_array)) {
+            global $wpdb;
+            $loc_table = $wpdb->prefix . 'kab_location';
+            $ids_str = implode(',', $location_ids_array);
+            $locations = $wpdb->get_results("SELECT * FROM $loc_table WHERE id IN ($ids_str) ORDER BY location_name ASC");
+        } else {
+            $locations = array();
         }
-        
+
         if (!empty($locations)) {
-            // Get all location categories for grouping
             $categories = kab_get_location_categories();
-            
-            // Add category_id to each location
-            foreach ($locations as &$location) {
-                $location->category_id = kab_get_location_category_id($location->id);
-            }
-            
+            // category_id is already included in SELECT * — no extra DB query per location
             wp_send_json_success(array(
                 'locations' => $locations,
                 'categories' => $categories
@@ -544,32 +536,31 @@ function kab_get_specialists_ajax() {
     
     // Process specialist data to ensure image URLs are properly formatted
     if (!empty($specialists)) {
+        // Batch-load tags and profession in one DB query instead of N queries
+        $specialist_ids = array_column($specialists, 'id');
+        $db_data = kab_get_specialists_db_data_batch($specialist_ids);
+
         foreach ($specialists as $key => $specialist) {
-            // First check if profile_image is available (old plugin format)
             if (isset($specialist['profile_image'])) {
                 $specialists[$key]['image_url'] = $specialist['profile_image'];
-            }
-            // Then check for profilepicture property
-            else if (isset($specialist['profilepicture'])) {
+            } elseif (isset($specialist['profilepicture'])) {
                 $specialists[$key]['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $specialist['profilepicture'];
-            }
-            // Finally, check for image property that might contain a partial path
-            else if (isset($specialist['image']) && strpos($specialist['image'], 'http') !== 0) {
+            } elseif (isset($specialist['image']) && strpos($specialist['image'], 'http') !== 0) {
                 $specialists[$key]['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $specialist['image'];
             }
-            
-            // Add stored tags and profession from database
-            $stored_tags = kab_get_specialist_tags($specialist['id']);
-            if (!empty($stored_tags)) {
-                $specialists[$key]['stored_tags'] = $stored_tags;
-            }
-            $stored_profession = kab_get_specialist_profession($specialist['id']);
-            if ($stored_profession !== '') {
-                $specialists[$key]['profession'] = $stored_profession;
+
+            $sid = $specialist['id'];
+            if (isset($db_data[$sid])) {
+                if (!empty($db_data[$sid]['tags'])) {
+                    $specialists[$key]['stored_tags'] = $db_data[$sid]['tags'];
+                }
+                if ($db_data[$sid]['profession'] !== '') {
+                    $specialists[$key]['profession'] = $db_data[$sid]['profession'];
+                }
             }
         }
     }
-    
+
     // If specialist_id is provided, filter to only that specialist
     if (!empty($specialist_id) && !empty($specialists)) {
         $filtered_specialists = array();
@@ -658,35 +649,38 @@ function kab_get_all_therapists_ajax() {
     // Process therapist data to ensure image URLs are properly formatted
     $therapists_array = array();
     if (!empty($therapists)) {
-        foreach ($therapists as $therapist_id => $therapist) {
-            // Ensure therapist has an ID
-            if (!isset($therapist['id'])) {
-                $therapist['id'] = $therapist_id;
+        // Resolve IDs first, then batch-load DB data in one query
+        $resolved = array();
+        foreach ($therapists as $tid => $t) {
+            if (!isset($t['id'])) {
+                $t['id'] = $tid;
             }
-            
-            // Process image URL
+            $resolved[] = $t;
+        }
+        $db_data = kab_get_specialists_db_data_batch(array_column($resolved, 'id'));
+
+        foreach ($resolved as $therapist) {
             if (isset($therapist['profile_image'])) {
                 $therapist['image_url'] = $therapist['profile_image'];
-            } else if (isset($therapist['profilepicture'])) {
+            } elseif (isset($therapist['profilepicture'])) {
                 $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['profilepicture'];
-            } else if (isset($therapist['image']) && strpos($therapist['image'], 'http') !== 0) {
+            } elseif (isset($therapist['image']) && strpos($therapist['image'], 'http') !== 0) {
                 $therapist['image_url'] = 'https://images-files.konfidens.com/practitioners/profilepicture/' . $therapist['image'];
             }
-            
-            // Add stored tags and profession from database
-            $stored_tags = kab_get_specialist_tags($therapist['id']);
-            if (!empty($stored_tags)) {
-                $therapist['stored_tags'] = $stored_tags;
+
+            $sid = $therapist['id'];
+            if (isset($db_data[$sid])) {
+                if (!empty($db_data[$sid]['tags'])) {
+                    $therapist['stored_tags'] = $db_data[$sid]['tags'];
+                }
+                if ($db_data[$sid]['profession'] !== '') {
+                    $therapist['profession'] = $db_data[$sid]['profession'];
+                }
             }
-            $stored_profession = kab_get_specialist_profession($therapist['id']);
-            if ($stored_profession !== '') {
-                $therapist['profession'] = $stored_profession;
-            }
-            
-            // Location assignment removed - therapists no longer have location restrictions
+
             $therapist['has_locations'] = true;
             $therapist['location_ids'] = array();
-            
+
             $therapists_array[] = $therapist;
         }
     }
@@ -758,8 +752,8 @@ function kab_get_services_for_therapist_ajax() {
                 // Get therapists for this service
                 $service_therapists = kab_get_therapists_for_service($service_id);
                 
-                // Cache for 5 minutes
-                set_transient($therapist_cache_key, $service_therapists, 300);
+                // Cache for 30 minutes
+                set_transient($therapist_cache_key, $service_therapists, 1800);
             } else {
                 $service_therapists = $cached_therapists;
             }
@@ -774,8 +768,8 @@ function kab_get_services_for_therapist_ajax() {
             }
         }
         
-        // Cache the reverse map for 5 minutes
-        set_transient($therapist_service_map_key, $therapist_service_map, 300);
+        // Cache the reverse map for 30 minutes
+        set_transient($therapist_service_map_key, $therapist_service_map, 1800);
     }
     
     // Get service IDs for this therapist from the reverse map
@@ -820,9 +814,9 @@ function kab_get_services_for_therapist_ajax() {
         'services' => $therapist_services
     );
     
-    // Cache the result for 5 minutes (but don't cache if service set is used, as it's dynamic)
+    // Cache the result for 30 minutes (but don't cache if service set is used, as it's dynamic)
     if (empty($service_set_id)) {
-        set_transient($cache_key, $result, 300);
+        set_transient($cache_key, $result, 1800);
     }
     
     if (!empty($therapist_services)) {
@@ -871,28 +865,37 @@ function kab_get_categories_for_therapist_ajax() {
             $service_set_service_ids = $service_set['service_ids'];
         }
     }
-    
-    // Get therapists for each service to find which services belong to this therapist
-    $therapist_service_ids = array();
-    
-    foreach ($all_services as $service) {
-        $service_id = $service['id'];
-        
-        // If service set is provided, skip services not in the set
-        if (!empty($service_set_id) && !empty($service_set_service_ids) && !in_array($service_id, $service_set_service_ids)) {
-            continue;
-        }
-        
-        $service_therapists = kab_get_therapists_for_service($service_id);
-        
-        foreach ($service_therapists as $therapist) {
-            if ($therapist['id'] === $therapist_id) {
-                $therapist_service_ids[] = $service_id;
-                break;
+
+    // Use the shared therapist-service map (cached) to avoid N API calls per service
+    $therapist_service_map_key = 'kab_therapist_service_map';
+    $therapist_service_map = get_transient($therapist_service_map_key);
+
+    if ($therapist_service_map === false) {
+        // Build map from individual per-service transients (warm cache = fast; cold = N API calls once)
+        $therapist_service_map = array();
+        foreach ($all_services as $service) {
+            $sid = $service['id'];
+            $service_therapists = kab_get_therapists_for_service($sid);
+            foreach ($service_therapists as $t) {
+                $tid = $t['id'];
+                if (!isset($therapist_service_map[$tid])) {
+                    $therapist_service_map[$tid] = array();
+                }
+                $therapist_service_map[$tid][] = $sid;
             }
         }
+        set_transient($therapist_service_map_key, $therapist_service_map, 1800);
     }
-    
+
+    $all_therapist_service_ids = isset($therapist_service_map[$therapist_id]) ? $therapist_service_map[$therapist_id] : array();
+
+    // Apply service-set filter
+    if (!empty($service_set_service_ids)) {
+        $therapist_service_ids = array_values(array_intersect($all_therapist_service_ids, $service_set_service_ids));
+    } else {
+        $therapist_service_ids = $all_therapist_service_ids;
+    }
+
     if (empty($therapist_service_ids)) {
         wp_send_json_success(array(
             'categories' => array(),
@@ -900,24 +903,17 @@ function kab_get_categories_for_therapist_ajax() {
         ));
         return;
     }
-    
-    // Get unique category IDs from therapist's services (filtered by service set if provided)
+
+    // Batch-load category IDs for all therapist services in one query
     global $wpdb;
     $location_service_table = $wpdb->prefix . 'kab_location_service';
-    
+    $sids_str = implode(',', array_map(function($s) use ($wpdb) { return $wpdb->prepare('%s', $s); }, $therapist_service_ids));
+    $category_rows = $wpdb->get_results(
+        "SELECT DISTINCT category_id FROM $location_service_table WHERE service_id IN ($sids_str) AND category_id IS NOT NULL"
+    );
     $category_ids = array();
-    foreach ($therapist_service_ids as $service_id) {
-        $service_location = $wpdb->get_row($wpdb->prepare(
-            "SELECT category_id FROM $location_service_table WHERE service_id = %s AND category_id IS NOT NULL",
-            $service_id
-        ));
-        
-        if ($service_location && $service_location->category_id) {
-            $cat_id = intval($service_location->category_id);
-            if (!in_array($cat_id, $category_ids)) {
-                $category_ids[] = $cat_id;
-            }
-        }
+    foreach ($category_rows as $row) {
+        $category_ids[] = intval($row->category_id);
     }
     
     if (empty($category_ids)) {
@@ -1003,30 +999,23 @@ function kab_get_locations_for_therapist_service_ajax() {
     
     // Get service locations (comma-separated location IDs, therapist location filtering removed)
     $service_location_ids = kab_get_service_locations($service_id);
-    
+
     if (!empty($service_location_ids)) {
-        $locations = array();
-        // Split comma-separated location IDs
-        $location_ids_array = array_map('trim', explode(',', $service_location_ids));
-        
-        foreach ($location_ids_array as $location_id) {
-            if (!empty($location_id)) {
-                $location = kab_get_location_by_id($location_id);
-                if ($location) {
-                    $locations[] = $location;
-                }
-            }
+        // Batch-load all locations in one query
+        $location_ids_array = array_filter(array_map('intval', array_map('trim', explode(',', $service_location_ids))));
+
+        if (!empty($location_ids_array)) {
+            global $wpdb;
+            $loc_table = $wpdb->prefix . 'kab_location';
+            $ids_str = implode(',', $location_ids_array);
+            $locations = $wpdb->get_results("SELECT * FROM $loc_table WHERE id IN ($ids_str) ORDER BY location_name ASC");
+        } else {
+            $locations = array();
         }
-        
+
         if (!empty($locations)) {
-            // Get all location categories for grouping
             $categories = kab_get_location_categories();
-            
-            // Add category_id to each location
-            foreach ($locations as &$location) {
-                $location->category_id = kab_get_location_category_id($location->id);
-            }
-            
+            // category_id is already included in SELECT * — no extra DB query per location
             wp_send_json_success(array(
                 'locations' => $locations,
                 'categories' => $categories
@@ -1095,36 +1084,20 @@ function kab_get_available_dates() {
         // Set the first available date as selected
         if (!empty($dates)) {
             $selected_date = $dates[0];
-            
-            // Get time slots for the selected date
-            $from_date_selected = date('Y-m-d\T00:00:00\Z', strtotime($selected_date));
-            $to_date_selected = date('Y-m-d\T23:59:59\Z', strtotime($selected_date));
-            
-            $slots_response = kab_api_request('timeslots', array(
-                'clinic_id' => get_option('kab_clinic_id', ''),
-                'from_date' => $from_date_selected,
-                'to_date' => $to_date_selected,
-                'service_id' => $service_id,
-                'specialist_id' => $specialist_id
-            ));
-            
-            if ($slots_response['success'] && !empty($slots_response['data'])) {
-                $html_booking_slot = '';
-                
-                foreach ($slots_response['data'] as $slot) {
-                    if (is_array($slot)) {
-                        // Old format
-                        if (isset($slot['time_from']) && isset($slot['booking_token'])) {
-                            $time = date('H:i', strtotime($slot['time_from']));
-                            $slot_value = $slot['booking_token'];
-                            $html_booking_slot .= "<div class='kab-time-slot' data-timeslot='" . esc_attr($slot_value) . "'>" . esc_html($time) . "</div>";
-                        }
-                    } else {
-                        // New format
-                        $time = explode('T', $slot)[1];
-                        $time = substr($time, 0, 5);
-                        $html_booking_slot .= "<div class='kab-time-slot' data-timeslot='" . esc_attr($slot) . "'>" . esc_html($time) . "</div>";
-                    }
+
+            // Filter slots for the first date from the already-fetched 30-day response (no second API call)
+            $html_booking_slot = '';
+            foreach ($timeslots as $slot) {
+                if (is_array($slot)) {
+                    if (!isset($slot['time_from']) || !isset($slot['booking_token'])) continue;
+                    $slot_date = isset($slot['date']) ? $slot['date'] : explode('T', $slot['time_from'])[0];
+                    if ($slot_date !== $selected_date) continue;
+                    $time = date('H:i', strtotime($slot['time_from']));
+                    $html_booking_slot .= "<div class='kab-time-slot' data-timeslot='" . esc_attr($slot['booking_token']) . "'>" . esc_html($time) . "</div>";
+                } else {
+                    if (strpos($slot, $selected_date) !== 0) continue;
+                    $time = substr(explode('T', $slot)[1], 0, 5);
+                    $html_booking_slot .= "<div class='kab-time-slot' data-timeslot='" . esc_attr($slot) . "'>" . esc_html($time) . "</div>";
                 }
             }
         }

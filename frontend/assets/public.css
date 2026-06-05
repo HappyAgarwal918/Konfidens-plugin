@@ -1058,7 +1058,7 @@
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 9999;
+    z-index: 99999;
     height: 100%;
     width: 100%;
 }
@@ -1115,7 +1115,8 @@
         opacity: 0;
     }
     .kab-popup-content {
-        max-height: 95vh;
+        max-height: calc(var(--kab-vh, 1vh) * 95); /* JS-driven for older iOS Safari */
+        max-height: 95dvh; /* Modern browsers: updates as Safari toolbar shows/hides */
         border-radius: 16px 16px 0 0;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
         top: 0;

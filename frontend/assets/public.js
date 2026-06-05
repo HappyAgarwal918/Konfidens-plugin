@@ -12,6 +12,20 @@
         console.log('[KAB GTM] dataLayer.push', obj);
     }
 
+    // iOS Safari viewport fix: --kab-vh tracks the real visible height so the popup
+    // bottom sheet stays flush with the screen when Safari's toolbar slides in/out.
+    (function() {
+        function setKabVH() {
+            var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty('--kab-vh', (h / 100) + 'px');
+        }
+        setKabVH();
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', setKabVH);
+        }
+        window.addEventListener('resize', setKabVH);
+    })();
+
     /**
      * Fetch a fresh public nonce and update kab_vars.nonce.
      * Tries REST first, then admin-ajax fallback (for when REST is disabled/blocked).
@@ -1813,8 +1827,8 @@
             $form.data('kab-form-instance', instance);
         });
         
-        // Initialize popup functionality
-        $('.kab-button[data-popup-target]').click(function() {
+        // Initialize popup functionality (event delegation so it works inside Elementor popups/templates)
+        $(document).on('click', '.kab-button[data-popup-target]', function() {
             const $button = $(this);
             const popupId = $button.data('popup-target');
             const $popup = $('#' + popupId);
@@ -1855,7 +1869,7 @@
             });
         });
         
-        $('.kab-popup-close').click(function() {
+        $(document).on('click', '.kab-popup-close', function() {
             const $p = $(this).closest('.kab-popup');
             const $stdForm = $p.find('.kab-booking-form').not('.kab-therapist-first');
             const $tfForm = $p.find('.kab-booking-form.kab-therapist-first');

@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.2.5
+ * Version: 1.2.64
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('KAB_VERSION', '1.2.5');
+define('KAB_VERSION', '1.2.64');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -143,6 +143,13 @@ function kab_register_scripts() {
     wp_register_style('kab-css', KAB_PLUGIN_URL . 'frontend/assets/public.css', array(), KAB_VERSION);
     wp_register_script('kab-js', KAB_PLUGIN_URL . 'frontend/assets/public.js', array('jquery'), KAB_VERSION, true);
     wp_register_script('kab-js-therapist-first', KAB_PLUGIN_URL . 'frontend/assets/public-therapist-first.js', array('jquery', 'kab-js'), KAB_VERSION, true);
+
+    // Elementor popups/header templates may inject shortcode HTML after wp_footer has already
+    // printed scripts, so kab_vars would never be defined via wp_localize_script. Enqueue eagerly
+    // on every Elementor page to guarantee the scripts (and kab_vars) are always available.
+    if (defined('ELEMENTOR_VERSION')) {
+        kab_enqueue_booking_assets();
+    }
 }
 add_action('wp_enqueue_scripts', 'kab_register_scripts', 5);
 
@@ -194,13 +201,18 @@ function kab_warm_booking_cache() {
 }
 
 /**
- * Clear API caches (call after saving settings or when data may have changed)
+ * Clear all API and derived caches (call after saving settings or when data changes)
  */
 function kab_clear_api_cache() {
     delete_transient('kab_services_with_priority');
+    delete_transient('kab_all_services_raw');
     delete_transient('kab_all_therapists');
     delete_transient('kab_all_services_with_categories');
     delete_transient('kab_therapist_service_map');
+    // Also clear per-therapist service caches
+    global $wpdb;
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_kab_therapist_services_%' OR option_name LIKE '_transient_kab_therapists_service_%' OR option_name LIKE '_transient_kab_service_therapists_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_kab_therapist_services_%' OR option_name LIKE '_transient_timeout_kab_therapists_service_%' OR option_name LIKE '_transient_timeout_kab_service_therapists_%'");
 }
 
 // Make API requests to Konfidens API with authentication

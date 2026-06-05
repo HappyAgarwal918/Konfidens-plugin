@@ -1544,8 +1544,8 @@
             $form.data('kab-form-instance', instance);
         });
         
-        // Initialize popup functionality for therapist-first forms
-        $('.kab-button[data-popup-target]').click(function() {
+        // Initialize popup functionality for therapist-first forms (event delegation so it works inside Elementor popups/templates)
+        $(document).on('click', '.kab-button[data-popup-target]', function() {
             const $button = $(this);
             const popupId = $button.data('popup-target');
             const $popup = $('#' + popupId);

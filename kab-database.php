@@ -840,6 +840,34 @@ function kab_update_specialist_profession($specialist_id, $profession) {
     }
 }
 
+/**
+ * Batch-load tags and profession for a list of specialist IDs in a single DB query.
+ * Returns: [ specialist_id => ['tags' => [...], 'profession' => '...'] ]
+ */
+function kab_get_specialists_db_data_batch(array $specialist_ids) {
+    if (empty($specialist_ids)) {
+        return array();
+    }
+    global $wpdb;
+    $table_name = $wpdb->prefix . 'kab_location_specialist';
+    $ids_str = implode(',', array_map(function($id) use ($wpdb) {
+        return $wpdb->prepare('%s', $id);
+    }, $specialist_ids));
+    $rows = $wpdb->get_results("SELECT specialist_id, tags, profession FROM $table_name WHERE specialist_id IN ($ids_str)");
+    $result = array();
+    foreach ($rows as $row) {
+        $tags = array();
+        if (!empty($row->tags)) {
+            $tags = array_values(array_filter(array_map('trim', explode(',', $row->tags))));
+        }
+        $result[$row->specialist_id] = array(
+            'tags'       => $tags,
+            'profession' => ($row->profession !== null && $row->profession !== '') ? $row->profession : '',
+        );
+    }
+    return $result;
+}
+
 // Save booking to local database after successful API booking
 function kab_save_booking($booking_data) {
     global $wpdb;

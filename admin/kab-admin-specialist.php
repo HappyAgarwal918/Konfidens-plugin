@@ -292,7 +292,7 @@ function kab_get_all_therapists() {
         }
     }
 
-    set_transient($cache_key, $therapists, 300); // 5 minutes
+    set_transient($cache_key, $therapists, 1800); // 30 minutes
     return $therapists;
 }
 
@@ -329,7 +329,7 @@ function kab_get_therapists_for_service($service_id) {
         $therapists = $specialists_response['data'];
     }
 
-    set_transient($cache_key, $therapists, 300); // 5 minutes
+    set_transient($cache_key, $therapists, 1800); // 30 minutes
     return $therapists;
 }
 

@@ -445,7 +445,7 @@ function kab_get_services_with_priority() {
         }
     }
 
-    set_transient($cache_key, $services, 300); // 5 minutes
+    set_transient($cache_key, $services, 1800); // 30 minutes
     return $services;
 }
 
