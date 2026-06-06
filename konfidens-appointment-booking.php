@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.2.64
+ * Version: 1.2.65
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('KAB_VERSION', '1.2.64');
+define('KAB_VERSION', '1.2.65');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -213,6 +213,7 @@ function kab_clear_api_cache() {
     global $wpdb;
     $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_kab_therapist_services_%' OR option_name LIKE '_transient_kab_therapists_service_%' OR option_name LIKE '_transient_kab_service_therapists_%'");
     $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_kab_therapist_services_%' OR option_name LIKE '_transient_timeout_kab_therapists_service_%' OR option_name LIKE '_transient_timeout_kab_service_therapists_%'");
+    $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_kab_avail_%' OR option_name LIKE '_transient_timeout_kab_avail_%'");
 }
 
 // Make API requests to Konfidens API with authentication

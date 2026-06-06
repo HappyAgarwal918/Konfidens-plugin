@@ -511,6 +511,28 @@ function kab_get_locations_ajax() {
 add_action('wp_ajax_kab_get_locations', 'kab_get_locations_ajax');
 add_action('wp_ajax_nopriv_kab_get_locations', 'kab_get_locations_ajax');
 
+/**
+ * Check whether a therapist has any bookable timeslots for a given service in the next 30 days.
+ * Result is cached per service+therapist pair for 30 minutes so repeated loads are instant.
+ */
+function kab_therapist_has_availability($service_id, $specialist_id) {
+    $cache_key = 'kab_avail_' . md5($service_id . '_' . $specialist_id);
+    $cached = get_transient($cache_key);
+    if ($cached !== false) {
+        return $cached === '1';
+    }
+    $response = kab_api_request('timeslots', array(
+        'clinic_id'     => get_option('kab_clinic_id', ''),
+        'from_date'     => date('Y-m-d\TH:i:s\Z'),
+        'to_date'       => date('Y-m-d\TH:i:s\Z', strtotime('+30 days')),
+        'service_id'    => $service_id,
+        'specialist_id' => $specialist_id,
+    ));
+    $has = $response['success'] && !empty($response['data']);
+    set_transient($cache_key, $has ? '1' : '0', 1800);
+    return $has;
+}
+
 // AJAX handler: Get specialists/therapists for selected service
 function kab_get_specialists_ajax() {
     // Check nonce
@@ -559,6 +581,14 @@ function kab_get_specialists_ajax() {
                 }
             }
         }
+    }
+
+    // Remove therapists who have no available timeslots for this service (next 30 days).
+    // Results are cached per therapist+service for 30 min so only the first request is slow.
+    if (!empty($specialists) && empty($specialist_id)) {
+        $specialists = array_values(array_filter($specialists, function($specialist) use ($service_id) {
+            return kab_therapist_has_availability($service_id, $specialist['id']);
+        }));
     }
 
     // If specialist_id is provided, filter to only that specialist
