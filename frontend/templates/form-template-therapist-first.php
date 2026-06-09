@@ -32,7 +32,7 @@ $form_classes[] = 'kab-context-' . $context;
                     <p><?php _e('Hvilken terapeut ønsker du å bestille en samtale med?', 'konfidens-appointment-booking'); ?></p>
                 </div>
                 <div class="kab-specialists-list">
-                    <div class="kab-loading"><?php _e('Loading therapists...', 'konfidens-appointment-booking'); ?></div>
+                    <div class="kab-loading"><?php _e('Laster inn terapeuter...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>
             <div class="kab-form-navigation">
@@ -50,7 +50,7 @@ $form_classes[] = 'kab-context-' . $context;
                 </div>
                 
                 <div class="kab-categories-list">
-                    <div class="kab-loading"><?php _e('Loading categories...', 'konfidens-appointment-booking'); ?></div>
+                    <div class="kab-loading"><?php _e('Laster inn kategorier...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>
             <!-- Selected Therapist Card -->
@@ -78,7 +78,7 @@ $form_classes[] = 'kab-context-' . $context;
                     <p><?php _e('Hvordan ønsker du å gjennomføre samtalen?', 'konfidens-appointment-booking'); ?></p>
                 </div>
                 <div class="kab-locations-list">
-                    <div class="kab-loading"><?php _e('Loading locations...', 'konfidens-appointment-booking'); ?></div>
+                    <div class="kab-loading"><?php _e('Laster inn steder...', 'konfidens-appointment-booking'); ?></div>
                 </div>
             </div>    
             <div class="kab-form-navigation">
@@ -103,7 +103,7 @@ $form_classes[] = 'kab-context-' . $context;
                         <h4><?php _e('Tilgjengelige tider', 'konfidens-appointment-booking'); ?></h4>
                         <div class="kab-time-slots">
                             <div class="kab-no-date-selected">
-                                <?php _e('Please select a date to view available time slots.', 'konfidens-appointment-booking'); ?>
+                                <?php _e('Vennligst velg en dato for å se tilgjengelige tidsluker.', 'konfidens-appointment-booking'); ?>
                             </div>
                         </div>
                     </div>
@@ -193,7 +193,7 @@ $form_classes[] = 'kab-context-' . $context;
         <div class="kab-form-step" data-step="5" style="display: none;">
             <div>
                 <div class="kab-confirmation-message">
-                    <div class="kab-loading"><?php _e('Processing your booking...', 'konfidens-appointment-booking'); ?></div>
+                    <div class="kab-loading"><?php _e('Behandler bestillingen din...', 'konfidens-appointment-booking'); ?></div>
                     <div class="kab-success" style="display: none;">
                         <div class="kab-success-icon">
                             <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
@@ -209,9 +209,9 @@ $form_classes[] = 'kab-context-' . $context;
                         <div class="kab-error-icon">
                             <img src="<?php echo plugins_url('frontend/assets/images/', dirname(dirname(__FILE__))) . 'illustration.png'; ?>" alt="<?php _e('Success', 'konfidens-appointment-booking'); ?>">
                         </div>
-                        <h3 class="kab-error-title"><?php _e('Booking Failed', 'konfidens-appointment-booking'); ?></h3>
+                        <h3 class="kab-error-title"><?php _e('Bestillingen mislyktes', 'konfidens-appointment-booking'); ?></h3>
                         <p class="kab-error-message"></p>
-                        <button class="kab-try-again-btn"><?php _e('Try Again', 'konfidens-appointment-booking'); ?></button>
+                        <button class="kab-try-again-btn"><?php _e('Prøv igjen', 'konfidens-appointment-booking'); ?></button>
                     </div>
                 </div>
             </div>

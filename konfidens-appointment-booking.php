@@ -3,7 +3,7 @@
  * Plugin Name: Konfidens Appointment Booking
  * Plugin URI: https://jobcvpro.com/konfidens-appointment-booking
  * Description: A WordPress plugin for appointment booking using the Konfidens API.
- * Version: 1.2.65
+ * Version: 1.2.7
  * Author: Happy
  * Author URI: https://jobcvpro.com
  * Text Domain: konfidens-appointment-booking
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Plugin constants
-define('KAB_VERSION', '1.2.65');
+define('KAB_VERSION', '1.2.7');
 define('KAB_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KAB_PLUGIN_URL', plugin_dir_url(__FILE__));
 
@@ -167,15 +167,15 @@ function kab_enqueue_booking_assets() {
         'rest_nonce_url' => rest_url('kab/v1/public-nonce'),
         'ajax_nonce_action' => 'kab_get_public_nonce',
         'plugin_url' => plugin_dir_url(__FILE__),
-        'loading' => __('Loading...', 'konfidens-appointment-booking'),
-        'error' => __('Error occurred. Please try again.', 'konfidens-appointment-booking'),
-        'no_services' => __('No services available.', 'konfidens-appointment-booking'),
-        'no_specialists' => __('No specialists available for this service.', 'konfidens-appointment-booking'),
-        'no_timeslots' => __('No available time slots for the selected date.', 'konfidens-appointment-booking'),
-        'select_service' => __('Please select a service.', 'konfidens-appointment-booking'),
-        'select_specialist' => __('Please select a specialist.', 'konfidens-appointment-booking'),
-        'select_date' => __('Please select a date.', 'konfidens-appointment-booking'),
-        'select_time' => __('Please select a time slot.', 'konfidens-appointment-booking'),
+        'loading' => __('Laster...', 'konfidens-appointment-booking'),
+        'error' => __('Det oppsto en feil. Prøv på nytt.', 'konfidens-appointment-booking'),
+        'no_services' => __('Ingen tjenester tilgjengelig.', 'konfidens-appointment-booking'),
+        'no_specialists' => __('Ingen spesialister tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking'),
+        'no_timeslots' => __('Ingen tilgjengelige tidsluker for den valgte datoen.', 'konfidens-appointment-booking'),
+        'select_service' => __('Vennligst velg en tjeneste.', 'konfidens-appointment-booking'),
+        'select_specialist' => __('Vennligst velg en spesialist.', 'konfidens-appointment-booking'),
+        'select_date' => __('Vennligst velg en dato.', 'konfidens-appointment-booking'),
+        'select_time' => __('Vennligst velg et tidsrom.', 'konfidens-appointment-booking'),
         'recaptcha_site_key' => get_option('kab_recaptcha_site_key', '')
     ));
 
@@ -225,7 +225,7 @@ function kab_api_request($endpoint, $args = array(), $method = 'GET') {
     if (empty($base_url) || empty($api_key)) {
         return array(
             'success' => false,
-            'message' => 'API credentials not configured',
+            'message' => 'API-legitimasjon ikke konfigurert',
             'data' => null
         );
     }
@@ -286,7 +286,7 @@ function kab_api_request($endpoint, $args = array(), $method = 'GET') {
     } else {
         $error_message = isset($response_data['message']) ? $response_data['message'] : 'API error';
         if ($response_code == 403) {
-            $error_message = 'API Access Forbidden (403). Please check your API key and permissions.';
+            $error_message = 'API-tilgang forbudt (403). Vennligst sjekk API-nøkkelen og tillatelsene dine.';
         }
         return array(
             'success' => false,

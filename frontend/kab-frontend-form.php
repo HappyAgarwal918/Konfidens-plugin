@@ -100,7 +100,7 @@ function kab_get_locations_by_service_set($set_id) {
 function kab_get_categories_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check if service set is provided
@@ -117,7 +117,7 @@ function kab_get_categories_ajax() {
                 'parent_categories' => $parent_categories
             ));
         } else {
-            wp_send_json_error(array('message' => __('No categories available for this service set.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Ingen kategorier tilgjengelig for dette tjenestesettet.', 'konfidens-appointment-booking')));
         }
     } else {
         // Get all service categories
@@ -132,7 +132,7 @@ function kab_get_categories_ajax() {
                 'parent_categories' => $parent_categories
             ));
         } else {
-            wp_send_json_error(array('message' => __('No categories available.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Ingen kategorier tilgjengelig.', 'konfidens-appointment-booking')));
         }
     }
 }
@@ -145,7 +145,7 @@ add_action('wp_ajax_nopriv_kab_get_categories', 'kab_get_categories_ajax');
 function kab_get_services() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Try cache first (5 minute cache)
@@ -170,7 +170,7 @@ function kab_get_services() {
     if (!empty($services)) {
         wp_send_json_success($result);
     } else {
-        wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen tjenester tilgjengelig.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_services', 'kab_get_services');
@@ -180,12 +180,12 @@ add_action('wp_ajax_nopriv_kab_get_services', 'kab_get_services');
 function kab_get_locations_by_category_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['category_id']) || empty($_POST['category_id'])) {
-        wp_send_json_error(array('message' => __('Category ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Kategori-ID er påkrevd.', 'konfidens-appointment-booking')));
     }
     
     $category_id = intval($_POST['category_id']);
@@ -266,7 +266,7 @@ function kab_get_locations_by_category_ajax() {
             'categories' => $location_categories
         ));
     } else {
-        wp_send_json_error(array('message' => __('No locations available for this category.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen lokasjoner tilgjengelig for denne kategorien.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_locations_by_category', 'kab_get_locations_by_category_ajax');
@@ -317,12 +317,12 @@ function kab_get_all_services_raw_cached() {
 function kab_get_service_price_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id'])) {
-        wp_send_json_error(array('message' => __('Service ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Tjeneste-ID er påkrevd.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -338,7 +338,7 @@ function kab_get_service_price_ajax() {
         }
     }
     if (!$service) {
-        wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Tjenesten ble ikke funnet.', 'konfidens-appointment-booking')));
     }
     
     $extract_price = function($value) {
@@ -410,13 +410,13 @@ add_action('wp_ajax_nopriv_kab_get_service_price', 'kab_get_service_price_ajax')
 function kab_get_service_by_category_location_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['category_id']) || empty($_POST['category_id']) ||
         !isset($_POST['location_id']) || empty($_POST['location_id'])) {
-        wp_send_json_error(array('message' => __('Category ID and Location ID are required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Kategori-ID og steds-ID er obligatorisk.', 'konfidens-appointment-booking')));
     }
     
     $category_id = intval($_POST['category_id']);
@@ -444,7 +444,7 @@ function kab_get_service_by_category_location_ajax() {
 
                 if (!$therapist_provides_service) {
                     wp_send_json_error(array(
-                        'message' => __('The selected therapist does not provide this service for the selected category and location combination.', 'konfidens-appointment-booking'),
+                        'message' => __('Den valgte terapeuten tilbyr ikke denne tjenesten for den valgte kategori- og lokasjonskombinasjonen.', 'konfidens-appointment-booking'),
                         'therapist_invalid' => true
                     ));
                     return;
@@ -453,10 +453,10 @@ function kab_get_service_by_category_location_ajax() {
 
             wp_send_json_success(array('service' => $service));
         } else {
-            wp_send_json_error(array('message' => __('Service not found.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Tjenesten ble ikke funnet.', 'konfidens-appointment-booking')));
         }
     } else {
-        wp_send_json_error(array('message' => __('No service available for this category and location combination.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen tjenester tilgjengelig for denne kategorien og lokasjonskombinasjonen.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_service_by_category_location', 'kab_get_service_by_category_location_ajax');
@@ -468,12 +468,12 @@ add_action('wp_ajax_nopriv_kab_get_service_by_category_location', 'kab_get_servi
 function kab_get_locations_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id'])) {
-        wp_send_json_error(array('message' => __('Service ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Tjeneste-ID er påkrevd.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -502,10 +502,10 @@ function kab_get_locations_ajax() {
                 'categories' => $categories
             ));
         } else {
-            wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Ingen lokasjoner tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking')));
         }
     } else {
-        wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen lokasjoner tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_locations', 'kab_get_locations_ajax');
@@ -537,12 +537,12 @@ function kab_therapist_has_availability($service_id, $specialist_id) {
 function kab_get_specialists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id'])) {
-        wp_send_json_error(array('message' => __('Service ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Tjeneste-ID kreves.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -608,7 +608,7 @@ function kab_get_specialists_ajax() {
     if (!empty($specialists)) {
         wp_send_json_success(array('specialists' => $specialists));
     } else {
-        wp_send_json_error(array('message' => __('No specialists available for this service.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen spesialister tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_specialists', 'kab_get_specialists_ajax');
@@ -618,7 +618,7 @@ add_action('wp_ajax_nopriv_kab_get_specialists', 'kab_get_specialists_ajax');
 function kab_get_all_therapists_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check if service set is provided
@@ -719,8 +719,8 @@ function kab_get_all_therapists_ajax() {
         wp_send_json_success(array('therapists' => $therapists_array));
     } else {
         $error_msg = !empty($service_set_id)
-            ? __('No therapists available for the selected service set.', 'konfidens-appointment-booking')
-            : __('No therapists available.', 'konfidens-appointment-booking');
+            ? __('Ingen terapeuter tilgjengelig for det valgte tjenestesettet.', 'konfidens-appointment-booking')
+            : __('Ingen terapeuter tilgjengelig.', 'konfidens-appointment-booking');
         wp_send_json_error(array('message' => $error_msg));
     }
 }
@@ -739,7 +739,7 @@ function kab_get_services_for_therapist_ajax() {
     
     // Check required fields
     if (!isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
-        wp_send_json_error(array('message' => __('Therapist ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Terapeut-ID kreves.', 'konfidens-appointment-booking')));
     }
     
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
@@ -757,7 +757,7 @@ function kab_get_services_for_therapist_ajax() {
     $all_services = kab_get_services_with_priority();
     
     if (empty($all_services)) {
-        wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen tjenester tilgjengelig.', 'konfidens-appointment-booking')));
         return;
     }
     
@@ -853,8 +853,8 @@ function kab_get_services_for_therapist_ajax() {
         wp_send_json_success($result);
     } else {
         $error_msg = !empty($service_set_id) 
-            ? __('No services available for this therapist in the selected service set.', 'konfidens-appointment-booking')
-            : __('No services available for this therapist.', 'konfidens-appointment-booking');
+            ? __('Ingen tjenester tilgjengelig for denne terapeuten i det valgte tjenestesettet.', 'konfidens-appointment-booking')
+            : __('Ingen tjenester tilgjengelig for denne terapeuten.', 'konfidens-appointment-booking');
         wp_send_json_error(array('message' => $error_msg));
     }
 }
@@ -873,7 +873,7 @@ function kab_get_categories_for_therapist_ajax() {
     
     // Check required fields
     if (!isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
-        wp_send_json_error(array('message' => __('Therapist ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Terapeut-ID er påkrevd.', 'konfidens-appointment-booking')));
     }
     
     $therapist_id = sanitize_text_field($_POST['therapist_id']);
@@ -883,7 +883,7 @@ function kab_get_categories_for_therapist_ajax() {
     $all_services = kab_get_services_with_priority();
     
     if (empty($all_services)) {
-        wp_send_json_error(array('message' => __('No services available.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen tjenester tilgjengelig.', 'konfidens-appointment-booking')));
         return;
     }
     
@@ -993,12 +993,12 @@ add_action('wp_ajax_nopriv_kab_get_categories_for_therapist', 'kab_get_categorie
 function kab_get_specialist_locations_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['specialist_id']) || empty($_POST['specialist_id'])) {
-        wp_send_json_error(array('message' => __('Specialist ID is required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Spesialist-ID kreves.', 'konfidens-appointment-booking')));
     }
     
     $specialist_id = sanitize_text_field($_POST['specialist_id']);
@@ -1015,13 +1015,13 @@ add_action('wp_ajax_nopriv_kab_get_specialist_locations', 'kab_get_specialist_lo
 function kab_get_locations_for_therapist_service_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id']) ||
         !isset($_POST['therapist_id']) || empty($_POST['therapist_id'])) {
-        wp_send_json_error(array('message' => __('Service ID and Therapist ID are required.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Tjeneste-ID og terapeut-ID er påkrevd.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -1051,10 +1051,10 @@ function kab_get_locations_for_therapist_service_ajax() {
                 'categories' => $categories
             ));
         } else {
-            wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Ingen lokasjoner tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking')));
         }
     } else {
-        wp_send_json_error(array('message' => __('No locations available for this service.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen lokasjoner tilgjengelig for denne tjenesten.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_locations_for_therapist_service', 'kab_get_locations_for_therapist_service_ajax');
@@ -1066,13 +1066,13 @@ add_action('wp_ajax_nopriv_kab_get_locations_for_therapist_service', 'kab_get_lo
 function kab_get_available_dates() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id']) ||
         !isset($_POST['specialist_id']) || empty($_POST['specialist_id'])) {
-        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Mangler obligatoriske felt.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -1139,7 +1139,7 @@ function kab_get_available_dates() {
             'html_booking_slot' => $html_booking_slot
         ));
     } else {
-        wp_send_json_error(array('message' => __('No available dates found.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Ingen tilgjengelige datoer funnet.', 'konfidens-appointment-booking')));
     }
 }
 add_action('wp_ajax_kab_get_available_dates', 'kab_get_available_dates');
@@ -1149,14 +1149,14 @@ add_action('wp_ajax_nopriv_kab_get_available_dates', 'kab_get_available_dates');
 function kab_get_timeslots_ajax() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     if (!isset($_POST['service_id']) || empty($_POST['service_id']) ||
         !isset($_POST['specialist_id']) || empty($_POST['specialist_id']) ||
         !isset($_POST['from_date']) || empty($_POST['from_date'])) {
-        wp_send_json_error(array('message' => __('Missing required fields.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Mangler obligatoriske felt.', 'konfidens-appointment-booking')));
     }
     
     $service_id = sanitize_text_field($_POST['service_id']);
@@ -1207,7 +1207,7 @@ function kab_get_timeslots_ajax() {
     }
     
     // If we reach here, there was an error or no slots available
-    echo "<div class='kab-no-time-slots'>No available times for this date. Please select another date.</div>";
+    echo "<div class='kab-no-time-slots'>Ingen tilgjengelige tider for denne datoen. Vennligst velg en annen dato.</div>";
     die();
 }
 add_action('wp_ajax_kab_get_timeslots', 'kab_get_timeslots_ajax');
@@ -1217,17 +1217,17 @@ add_action('wp_ajax_nopriv_kab_get_timeslots', 'kab_get_timeslots_ajax');
 function kab_create_booking() {
     // Check nonce
     if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'kab-public-nonce')) {
-        wp_send_json_error(array('message' => __('Security check failed.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
+        wp_send_json_error(array('message' => __('Sikkerhetskontrollen mislyktes.', 'konfidens-appointment-booking'), 'code' => 'security_check_failed'));
     }
     
     // Check required fields
     $required_fields = array(
-        'service_id' => __('Service is required.', 'konfidens-appointment-booking'),
-        'specialist_id' => __('Specialist is required.', 'konfidens-appointment-booking'),
-        'timeslot' => __('Time slot is required.', 'konfidens-appointment-booking'),
-        'first_name' => __('First name is required.', 'konfidens-appointment-booking'),
-        'email' => __('Email is required.', 'konfidens-appointment-booking'),
-        'phone' => __('Phone number is required.', 'konfidens-appointment-booking')
+        'service_id' => __('Tjenesten er påkrevd.', 'konfidens-appointment-booking'),
+        'specialist_id' => __('Spesialist er nødvendig.', 'konfidens-appointment-booking'),
+        'timeslot' => __('Tidsrom er påkrevd.', 'konfidens-appointment-booking'),
+        'first_name' => __('Fornavn er obligatorisk.', 'konfidens-appointment-booking'),
+        'email' => __('E-post er påkrevd.', 'konfidens-appointment-booking'),
+        'phone' => __('Telefonnummer er påkrevd.', 'konfidens-appointment-booking')
     );
     
     // Last name is optional (for therapist-first form)
@@ -1240,7 +1240,7 @@ function kab_create_booking() {
     
     // Validate email
     if (!is_email($_POST['email'])) {
-        wp_send_json_error(array('message' => __('Please enter a valid email address.', 'konfidens-appointment-booking')));
+        wp_send_json_error(array('message' => __('Vennligst skriv inn en gyldig e-postadresse.', 'konfidens-appointment-booking')));
     }
     
     // Verify reCAPTCHA if enabled
@@ -1260,13 +1260,13 @@ function kab_create_booking() {
             );
             
             if (is_wp_error($verify_response)) {
-                wp_send_json_error(array('message' => __('reCAPTCHA verification failed. Please try again.', 'konfidens-appointment-booking')));
+                wp_send_json_error(array('message' => __('reCAPTCHA-verifisering mislyktes. Prøv på nytt.', 'konfidens-appointment-booking')));
             }
             
             $verify_data = json_decode(wp_remote_retrieve_body($verify_response), true);
             
             if (!isset($verify_data['success']) || $verify_data['success'] !== true) {
-                wp_send_json_error(array('message' => __('reCAPTCHA verification failed. Please try again.', 'konfidens-appointment-booking')));
+                wp_send_json_error(array('message' => __('reCAPTCHA-verifisering mislyktes. Prøv på nytt.', 'konfidens-appointment-booking')));
             }
         }
     }
@@ -1363,7 +1363,7 @@ function kab_create_booking() {
         }
         
         if (empty($booking_id)) {
-            wp_send_json_error(array('message' => __('Booking created but could not retrieve booking ID. Please contact support.', 'konfidens-appointment-booking')));
+            wp_send_json_error(array('message' => __('Bestilling opprettet, men kunne ikke hente bestillings-ID-en. Ta kontakt med kundestøtte.', 'konfidens-appointment-booking')));
             return;
         }
         
@@ -1390,12 +1390,12 @@ function kab_create_booking() {
         
         // Return success with booking details (no redirect - stay on confirmation step)
         wp_send_json_success(array(
-            'message' => __('Booking created successfully.', 'konfidens-appointment-booking'),
+            'message' => __('Bestillingen er opprettet.', 'konfidens-appointment-booking'),
             'booking_id' => $booking_id
         ));
     } else {
         // Get detailed error message from API response
-        $error_message = __('Failed to create booking. Please try again.', 'konfidens-appointment-booking');
+        $error_message = __('Kunne ikke opprette bestillingen. Prøv på nytt.', 'konfidens-appointment-booking');
         
         // Try to extract error message from various possible locations in the response
         if (isset($booking_response['message'])) {
@@ -1424,7 +1424,7 @@ function kab_create_booking() {
                         }
                     }
                     if (!empty($validation_errors)) {
-                        $error_message = __('Validation error: ', 'konfidens-appointment-booking') . implode('; ', $validation_errors);
+                        $error_message = __('Valideringsfeil: ', 'konfidens-appointment-booking') . implode('; ', $validation_errors);
                     }
                 }
                 // Check for message field

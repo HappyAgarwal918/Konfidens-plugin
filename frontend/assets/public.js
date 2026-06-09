@@ -498,7 +498,7 @@
             const $locationsList = this.$form.find('.kab-locations-list');
             
             if (!this.categoryId) {
-                $locationsList.html('<div class="kab-no-data">Please select a category first.</div>');
+                $locationsList.html('<div class="kab-no-data">Vennligst velg en kategori først.</div>');
                 return;
             }
             
@@ -603,7 +603,7 @@
                             });
                         }
                     } else {
-                        $locationsList.html('<div class="kab-no-data">No locations available for this category.</div>');
+                        $locationsList.html('<div class="kab-no-data">Ingen lokasjoner tilgjengelig for denne kategorien.</div>');
                     }
                 },
                 error: function() {
@@ -893,7 +893,7 @@
             
             // Ensure a therapist is selected before loading dates
             if (!this.specialistId) {
-                $datePicker.html('<div class="kab-no-data">Please select a therapist first.</div>');
+                $datePicker.html('<div class="kab-no-data">Vennligst velg en terapeut først.</div>');
                 return;
             }
             
@@ -961,7 +961,7 @@
                             }
                         }
                     } else {
-                        $datePicker.html('<div class="kab-no-data">No available dates found for this therapist. Please select a different therapist.</div>');
+                        $datePicker.html('<div class="kab-no-data">Ingen tilgjengelige datoer funnet for denne terapeuten. Vennligst velg en annen terapeut.</div>');
                         $timeSlots.html('');
                     }
                 },
@@ -1448,7 +1448,7 @@
             
             // Ensure a therapist is selected
             if (!this.specialistId) {
-                $timeSlots.html('<div class="kab-no-data">Please select a therapist first.</div>');
+                $timeSlots.html('<div class="kab-no-data">Vennligst velg en terapeut først.</div>');
                 return;
             }
             
@@ -1715,7 +1715,7 @@
             if (!firstName || !email || !phone) {
                 $loading.hide();
                 $error.show();
-                $error.find('.kab-error-message').text('Please fill in all required fields.');
+                $error.find('.kab-error-message').text('Vennligst fyll ut alle obligatoriske felt.');
                 return;
             }
             
@@ -1723,7 +1723,7 @@
             if (!this.serviceId || !this.specialistId || !this.selectedTime) {
                 $loading.hide();
                 $error.show();
-                $error.find('.kab-error-message').text('Missing booking information. Please go back and complete all steps.');
+                $error.find('.kab-error-message').text('Mangler bestillingsinformasjon. Gå tilbake og fullfør alle trinnene.');
                 return;
             }
             
